@@ -1,0 +1,395 @@
+import type {
+  MemoRequest,
+  Role,
+  SiteName,
+  User,
+  Vendor,
+  PurchaseOrder,
+  ReceivingRecord,
+  PaymentRequest,
+} from "@/lib/types";
+
+export const sites: SiteName[] = [
+  "Head Office",
+  "Hat Yai Plant",
+  "Surat Thani Distribution Center",
+  "Phuket Sales Office",
+  "Nakhon Si Thammarat Depot",
+];
+
+export const departments = [
+  "ฝ่ายผลิต",
+  "ฝ่ายจัดซื้อ",
+  "ฝ่ายบัญชี",
+  "ฝ่ายโลจิสติกส์",
+  "ฝ่ายการตลาด",
+];
+
+export const roles: Role[] = [
+  "Requester",
+  "Approver",
+  "Purchasing",
+  "Finance",
+  "Admin",
+];
+
+export const users: User[] = [
+  {
+    id: "u1",
+    name: "นายสมชาย ศรีสม",
+    role: "Requester",
+    department: "ฝ่ายผลิต",
+    site: "Hat Yai Plant",
+  },
+  {
+    id: "u2",
+    name: "นางสาวปัทมา วัฒนสุข",
+    role: "Approver",
+    department: "ฝ่ายจัดซื้อ",
+    site: "Head Office",
+  },
+  {
+    id: "u3",
+    name: "นายวรพันธ์ นิ่มนวล",
+    role: "Purchasing",
+    department: "ฝ่ายจัดซื้อ",
+    site: "Surat Thani Distribution Center",
+  },
+  {
+    id: "u4",
+    name: "นางสาวจารุวรรณ ไชยวงศ์",
+    role: "Finance",
+    department: "ฝ่ายบัญชี",
+    site: "Head Office",
+  },
+  {
+    id: "u5",
+    name: "นายธนากร บุญเกิด",
+    role: "Admin",
+    department: "ฝ่ายไอที",
+    site: "Head Office",
+  },
+];
+
+export const vendors: Vendor[] = [
+  {
+    id: "v1",
+    name: "บริษัท ไทยแพ็คซัพพลาย จำกัด",
+    badge: "Approved",
+    price: 125000,
+    leadTime: "7 วัน",
+    creditTerm: "30 วัน",
+    rating: 4.8,
+    approved: true,
+  },
+  {
+    id: "v2",
+    name: "หจก. สตาร์เวิร์ค โลจิสติกส์",
+    badge: "Preferred",
+    price: 132500,
+    leadTime: "10 วัน",
+    creditTerm: "45 วัน",
+    rating: 4.5,
+    approved: false,
+  },
+  {
+    id: "v3",
+    name: "บริษัท เอสที อินโนเวชั่น จำกัด",
+    badge: "New",
+    price: 119900,
+    leadTime: "5 วัน",
+    creditTerm: "15 วัน",
+    rating: 4.3,
+    approved: false,
+  },
+];
+
+const today = new Date();
+const toISO = (offsetDays = 0) =>
+  new Date(today.getTime() + offsetDays * 24 * 60 * 60 * 1000)
+    .toISOString()
+    .slice(0, 10);
+
+function totalFromItems(items: { quantity: number; unitPrice: number }[]) {
+  return items.reduce((sum, item) => sum + item.quantity * item.unitPrice, 0);
+}
+
+export const memoRequests: MemoRequest[] = [
+  {
+    id: "memo-1",
+    documentNumber: "MEMO-2026-000001",
+    requesterId: "u1",
+    requesterName: "นายสมชาย ศรีสม",
+    department: "ฝ่ายผลิต",
+    site: "Hat Yai Plant",
+    costCenter: "CC-1201",
+    requestDate: toISO(-2),
+    requiredDate: toISO(4),
+    title: "ขวด PET และฉลากสินค้า สำหรับบรรจุภัณฑ์เดือนพฤษภาคม",
+    category: "Packaging",
+    purpose: "รองรับการผลิตเครื่องดื่มใหม่และสต็อกฉลากสินค้า",
+    urgency: "Normal",
+    budgetCode: "BUD-3302",
+    deliveryLocation: "โรงงานหาดใหญ่",
+    items: [
+      {
+        id: "item-1",
+        name: "ขวด PET 330 มล.",
+        quantity: 12000,
+        unit: "ชิ้น",
+        unitPrice: 3.5,
+        category: "Packaging",
+      },
+      {
+        id: "item-2",
+        name: "ฉลากสินค้าเต็มสี",
+        quantity: 12000,
+        unit: "แผ่น",
+        unitPrice: 0.9,
+        category: "Packaging",
+      },
+    ],
+    attachments: ["ไฟล์ใบเสนอราคา.pdf", "รายการวัสดุ.xlsx"],
+    budgetRemaining: 450000,
+    status: "Pending Approval",
+    procurementStatus: "Not Started",
+    assignedApproverId: "u2",
+    currentApproverName: "นางสาวปัทมา วัฒนสุข",
+    estimatedTotal: totalFromItems([
+      { quantity: 12000, unitPrice: 3.5 },
+      { quantity: 12000, unitPrice: 0.9 },
+    ]),
+    createdAt: toISO(-2),
+    updatedAt: toISO(-1),
+    history: [
+      {
+        id: "hist-memo-1-1",
+        documentId: "memo-1",
+        documentNumber: "MEMO-2026-000001",
+        documentType: "Memo",
+        actorId: "u1",
+        actorName: "นายสมชาย ศรีสม",
+        role: "Requester",
+        action: "Submitted",
+        comment: "ส่งคำขอสำหรับการผลิตเดือนถัดไป",
+        date: toISO(-2),
+        actionLabelTh: "ส่งขออนุมัติ",
+      },
+    ],
+  },
+  {
+    id: "memo-2",
+    documentNumber: "MEMO-2026-000002",
+    requesterId: "u1",
+    requesterName: "นายสมชาย ศรีสม",
+    department: "ฝ่ายผลิต",
+    site: "Hat Yai Plant",
+    costCenter: "CC-1201",
+    requestDate: toISO(-10),
+    requiredDate: toISO(-3),
+    title: "สั่งซื้อ CO2 และน้ำตาล 1 ตัน",
+    category: "Raw Material",
+    purpose: "เติมวัตถุดิบรองรับการผลิตสูตรเครื่องดื่มใหม่",
+    urgency: "Urgent",
+    budgetCode: "BUD-2305",
+    deliveryLocation: "โกดังหาดใหญ่",
+    items: [
+      {
+        id: "item-3",
+        name: "CO2 ถัง 50 กก.",
+        quantity: 10,
+        unit: "ถัง",
+        unitPrice: 6200,
+        category: "Raw Material",
+      },
+      {
+        id: "item-4",
+        name: "น้ำตาลทรายขาว",
+        quantity: 1000,
+        unit: "กก.",
+        unitPrice: 25,
+        category: "Raw Material",
+      },
+    ],
+    attachments: ["ใบเสนอราคาวัตถุดิบ.pdf"],
+    budgetRemaining: 280000,
+    status: "Approved",
+    procurementStatus: "PR Created",
+    assignedApproverId: "u2",
+    currentApproverName: "ฝ่ายจัดซื้อ",
+    estimatedTotal: totalFromItems([
+      { quantity: 10, unitPrice: 6200 },
+      { quantity: 1000, unitPrice: 25 },
+    ]),
+    createdAt: toISO(-10),
+    updatedAt: toISO(-4),
+    history: [
+      {
+        id: "hist-memo-2-1",
+        documentId: "memo-2",
+        documentNumber: "MEMO-2026-000002",
+        documentType: "Memo",
+        actorId: "u1",
+        actorName: "นายสมชาย ศรีสม",
+        role: "Requester",
+        action: "Submitted",
+        comment: "ขออนุมัติวัตถุดิบด่วน",
+        date: toISO(-10),
+        actionLabelTh: "ส่งขออนุมัติ",
+      },
+      {
+        id: "hist-memo-2-2",
+        documentId: "memo-2",
+        documentNumber: "MEMO-2026-000002",
+        documentType: "Memo",
+        actorId: "u2",
+        actorName: "นางสาวปัทมา วัฒนสุข",
+        role: "Approver",
+        action: "Approved",
+        comment: "เห็นชอบจัดซื้อวัตถุดิบตามแผน",
+        date: toISO(-9),
+        actionLabelTh: "อนุมัติ",
+      },
+    ],
+  },
+  {
+    id: "memo-3",
+    documentNumber: "MEMO-2026-000003",
+    requesterId: "u1",
+    requesterName: "นายสมชาย ศรีสม",
+    department: "ฝ่ายผลิต",
+    site: "Hat Yai Plant",
+    costCenter: "CC-1201",
+    requestDate: toISO(-18),
+    requiredDate: toISO(-10),
+    title: "อะไหล่เครื่องบรรจุ และอุปกรณ์สำนักงาน",
+    category: "Spare Parts",
+    purpose: "ซ่อมบำรุงเครื่องบรรจุและสนับสนุนงานสำนักงาน",
+    urgency: "Normal",
+    budgetCode: "BUD-1308",
+    deliveryLocation: "คลังอะไหล่โรงงาน",
+    items: [
+      {
+        id: "item-5",
+        name: "อะไหล่สายพานเครื่องบรรจุ",
+        quantity: 15,
+        unit: "ชิ้น",
+        unitPrice: 3200,
+        category: "Spare Parts",
+      },
+      {
+        id: "item-6",
+        name: "กระดาษ A4",
+        quantity: 10,
+        unit: "แพ็ค",
+        unitPrice: 180,
+        category: "Factory Supplies",
+      },
+    ],
+    attachments: ["ใบเสนอราคาอะไหล่.pdf", "ใบคำขอ.xlsx"],
+    budgetRemaining: 190000,
+    status: "Approved",
+    procurementStatus: "Vendor Selected",
+    assignedApproverId: "u2",
+    currentApproverName: "ฝ่ายจัดซื้อ",
+    estimatedTotal: totalFromItems([
+      { quantity: 15, unitPrice: 3200 },
+      { quantity: 10, unitPrice: 180 },
+    ]),
+    createdAt: toISO(-18),
+    updatedAt: toISO(-12),
+    history: [
+      {
+        id: "hist-memo-3-1",
+        documentId: "memo-3",
+        documentNumber: "MEMO-2026-000003",
+        documentType: "Memo",
+        actorId: "u1",
+        actorName: "นายสมชาย ศรีสม",
+        role: "Requester",
+        action: "Submitted",
+        comment: "ทั้งอะไหล่และวัสดุสำนักงาน",
+        date: toISO(-18),
+        actionLabelTh: "ส่งขออนุมัติ",
+      },
+      {
+        id: "hist-memo-3-2",
+        documentId: "memo-3",
+        documentNumber: "MEMO-2026-000003",
+        documentType: "Memo",
+        actorId: "u2",
+        actorName: "นางสาวปัทมา วัฒนสุข",
+        role: "Approver",
+        action: "Approved",
+        comment: "อนุมัติให้จัดซื้อ",
+        date: toISO(-17),
+        actionLabelTh: "อนุมัติ",
+      },
+    ],
+  },
+];
+
+export const purchaseOrders: PurchaseOrder[] = [
+  {
+    id: "po-1",
+    documentNumber: "PO-2026-000001",
+    memoId: "memo-2",
+    memoTitle: "สั่งซื้อ CO2 และน้ำตาล 1 ตัน",
+    vendorId: "v1",
+    vendorName: "บริษัท ไทยแพ็คซัพพลาย จำกัด",
+    procurementStatus: "Sent to Vendor",
+    amount: 12000 * 25 + 10 * 6200,
+    createdAt: toISO(-8),
+    updatedAt: toISO(-6),
+    sentToVendorAt: toISO(-6),
+  },
+];
+
+export const receivingRecords: ReceivingRecord[] = [
+  {
+    id: "recv-1",
+    poId: "po-1",
+    poNumber: "PO-2026-000001",
+    vendorName: "บริษัท ไทยแพ็คซัพพลาย จำกัด",
+    deliveryDate: toISO(-2),
+    receivedQty: 1010,
+    condition: "Good",
+    lotNumber: "L-20260501",
+    batchNumber: "B-0289",
+    expiryDate: toISO(365),
+    coaMsds: true,
+    qcRequired: true,
+    qcStatus: "QC Passed",
+    notes: "รับครบตามปริมาณและผ่านการตรวจสอบ QC แล้ว",
+  },
+];
+
+export const paymentRequests: PaymentRequest[] = [
+  {
+    id: "pay-1",
+    poId: "po-1",
+    poNumber: "PO-2026-000001",
+    vendorName: "บริษัท ไทยแพ็คซัพพลาย จำกัด",
+    invoiceAmount: 125000,
+    receivingAmount: 124000,
+    status: "Ready for AP Posting",
+    invoiceUploaded: true,
+    createdAt: toISO(-1),
+  },
+];
+
+export const defaultRole: Role = "Requester";
+export const defaultUserId = "u1";
+
+export const initialStoreState = {
+  users,
+  vendors,
+  memos: memoRequests,
+  purchaseOrders,
+  poApprovalRequests: [],
+  approvalHistory: memoRequests.flatMap((memo) => memo.history),
+  receivingRecords,
+  paymentRequests,
+  currentRole: defaultRole,
+  currentUserId: defaultUserId,
+};
