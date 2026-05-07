@@ -1,0 +1,288 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  Requester
+  Approver
+  Purchasing
+  Finance
+  Admin
+}
+
+enum MemoStatus {
+  Draft
+  PendingApproval
+  Approved
+  Rejected
+  RevisionRequired
+  ConvertedToPR
+}
+
+enum ProcurementStatus {
+  NotStarted
+  PRCreated
+  WaitingForPurchasingToProposeVendors
+  PendingPRApproval
+  PendingVendorApproval
+  VendorApproved
+  POCreated
+  SentToVendor
+  PendingReceiving
+  Received
+  QCPassed
+  PaymentPending
+  Closed
+  VendorSelected
+  PendingPOApproval
+  POApproved
+  PORejected
+  Receiving
+  QCPending
+}
+
+enum ProcurementCategory {
+  RawMaterial
+  Packaging
+  SpareParts
+  FactorySupplies
+  MarketingPOSM
+  FleetVehicle
+  ITOffice
+  ServiceContractor
+}
+
+enum SiteName {
+  HeadOffice
+  HatYaiPlant
+  SuratThaniDistributionCenter
+  PhuketSalesOffice
+  NakhonSiThammaratDepot
+}
+
+enum MemoUrgency {
+  Normal
+  Urgent
+  Emergency
+}
+
+enum DocumentType {
+  Memo
+  PR
+  PO
+}
+
+enum HistoryAction {
+  Approved
+  Rejected
+  RevisionRequired
+  Submitted
+  Resubmitted
+  DraftSaved
+  VendorProposed
+  SubmittedForVendorApproval
+  VendorConfirmed
+}
+
+enum ReceivingCondition {
+  Good
+  Damaged
+  Partial
+}
+
+enum QCStatus {
+  PendingQC
+  QCPassed
+  QCFailed
+  Quarantine
+  NotRequired
+}
+
+enum PaymentStatus {
+  PendingInvoice
+  ReadyForAPPosting
+  ApprovedForPayment
+  Paid
+}
+
+enum POApprovalStatus {
+  Pending
+  Approved
+  Rejected
+}
+
+model User {
+  id                  String            @id
+  name                String
+  role                Role
+  department          String
+  site                SiteName
+  requestedMemos      Memo[]            @relation("RequesterMemos")
+  assignedMemos       Memo[]            @relation("ApproverMemos")
+  approvalHistories   ApprovalHistory[]
+  proposedVendors     VendorProposal[]
+}
+
+model Memo {
+  id                  String             @id
+  documentNumber      String             @unique
+  requesterId         String
+  requesterName       String
+  department          String
+  site                SiteName
+  costCenter          String
+  requestDate         String
+  requiredDate        String
+  title               String
+  category            ProcurementCategory
+  purpose             String
+  urgency             MemoUrgency
+  budgetCode          String
+  deliveryLocation    String
+  attachments         String[]
+  budgetRemaining     Float
+  status              MemoStatus
+  procurementStatus   ProcurementStatus
+  assignedApproverId  String
+  currentApproverName String
+  estimatedTotal      Float
+  createdAt           DateTime
+  updatedAt           DateTime
+  prNumber            String?
+  poNumber            String?
+  selectedVendorId    String?
+  poApprovalStatus    POApprovalStatus?
+  poApprovalRequired  Boolean?
+  poAmount            Float?
+  requester           User               @relation("RequesterMemos", fields: [requesterId], references: [id], onDelete: Restrict)
+  assignedApprover    User               @relation("ApproverMemos", fields: [assignedApproverId], references: [id], onDelete: Restrict)
+  items               MemoItem[]
+  history             ApprovalHistory[]
+  purchaseOrders      PurchaseOrder[]
+}
+
+model MemoItem {
+  id         String              @id
+  memoId      String
+  name       String
+  quantity   Float
+  unit       String
+  unitPrice  Float
+  category   ProcurementCategory
+  memo       Memo                @relation(fields: [memoId], references: [id], onDelete: Cascade)
+}
+
+model ApprovalHistory {
+  id              String         @id
+  memoId          String?
+  purchaseOrderId String?
+  documentId      String
+  documentNumber  String
+  documentType    DocumentType
+  actorId         String
+  actorName       String
+  role            Role
+  action          HistoryAction
+  comment         String
+  date            DateTime
+  actionLabelTh   String
+  actor           User           @relation(fields: [actorId], references: [id], onDelete: Restrict)
+  memo            Memo?          @relation(fields: [memoId], references: [id], onDelete: Cascade)
+  purchaseOrder   PurchaseOrder? @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+}
+
+model Vendor {
+  id              String           @id
+  name            String
+  badge           String
+  price           Float
+  leadTime        String
+  creditTerm      String
+  rating          Float
+  approved        Boolean
+  purchaseOrders  PurchaseOrder[]
+  vendorProposals VendorProposal[]
+}
+
+model PurchaseOrder {
+  id                  String             @id
+  documentNumber      String
+  memoId              String
+  memoTitle           String
+  vendorId            String?
+  vendorName          String
+  procurementStatus   ProcurementStatus
+  amount              Float
+  createdAt           DateTime
+  updatedAt           DateTime
+  sentToVendorAt      DateTime?
+  quoteSelected       String?
+  selectedVendorId    String?
+  selectedVendorName  String?
+  poNumber            String?
+  prNumber            String?
+  poApprovalStatus    POApprovalStatus?
+  poApprovalRequired  Boolean?
+  memo                Memo               @relation(fields: [memoId], references: [id], onDelete: Cascade)
+  vendor              Vendor?            @relation(fields: [vendorId], references: [id], onDelete: SetNull)
+  vendorProposals     VendorProposal[]
+  history             ApprovalHistory[]
+  receivingRecords    ReceivingRecord[]
+  paymentRequests     PaymentRequest[]
+}
+
+model VendorProposal {
+  id                  String        @id
+  purchaseOrderId     String
+  vendorId            String?
+  vendorName          String
+  quotedPrice         Float
+  leadTime            String
+  paymentTerms        String
+  notes               String
+  attachmentName      String?
+  attachmentUrl       String?
+  submittedToApprover Boolean       @default(false)
+  proposedById        String
+  proposedByName      String
+  createdAt           DateTime
+  purchaseOrder       PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+  vendor              Vendor?       @relation(fields: [vendorId], references: [id], onDelete: SetNull)
+  proposedBy          User          @relation(fields: [proposedById], references: [id], onDelete: Restrict)
+}
+
+model ReceivingRecord {
+  id            String             @id
+  poId          String
+  poNumber      String
+  vendorName    String
+  deliveryDate  String
+  receivedQty   Float
+  condition     ReceivingCondition
+  lotNumber     String
+  batchNumber   String
+  expiryDate    String
+  coaMsds       Boolean
+  qcRequired    Boolean
+  qcStatus      QCStatus
+  notes         String
+  purchaseOrder PurchaseOrder      @relation(fields: [poId], references: [id], onDelete: Cascade)
+}
+
+model PaymentRequest {
+  id             String         @id
+  poId           String
+  poNumber       String
+  vendorName     String
+  invoiceAmount  Float
+  receivingAmount Float
+  status         PaymentStatus
+  invoiceUploaded Boolean
+  createdAt      DateTime
+  purchaseOrder  PurchaseOrder  @relation(fields: [poId], references: [id], onDelete: Cascade)
+}

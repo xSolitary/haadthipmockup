@@ -30,11 +30,11 @@ export function MemoApprovalPage({ memoId }: { memoId: string }) {
     memo.status === "Pending Approval" &&
     memo.assignedApproverId === currentUserId;
 
-  const handleAction = (action: "approve" | "revision" | "reject") => {
+  const handleAction = async (action: "approve" | "revision" | "reject") => {
     if (!memo) return;
-    if (action === "approve") approveMemo(memo.id, comment);
-    if (action === "revision") requestRevision(memo.id, comment);
-    if (action === "reject") rejectMemo(memo.id, comment);
+    if (action === "approve") await approveMemo(memo.id, comment);
+    if (action === "revision") await requestRevision(memo.id, comment);
+    if (action === "reject") await rejectMemo(memo.id, comment);
     router.push("/my-requests");
   };
 

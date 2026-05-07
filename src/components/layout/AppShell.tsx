@@ -1,6 +1,6 @@
 "use client";
 
-import { ReactNode } from "react";
+import { ReactNode, useEffect } from "react";
 import { AuthGate } from "@/components/layout/AuthGate";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { Topbar } from "@/components/layout/Topbar";
@@ -12,6 +12,15 @@ interface AppShellProps {
 
 export function AppShell({ children }: AppShellProps) {
   const isAuthenticated = useProcurementStore((state) => state.isAuthenticated);
+  const initializeData = useProcurementStore((state) => state.initializeData);
+
+  useEffect(() => {
+    if (!isAuthenticated) {
+      return;
+    }
+
+    void initializeData();
+  }, [initializeData, isAuthenticated]);
 
   if (!isAuthenticated) {
     return <AuthGate />;

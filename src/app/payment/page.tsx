@@ -16,14 +16,14 @@ export default function PaymentPage() {
 
   const selectedPayment = paymentRequests.find((payment) => payment.id === selectedPaymentId) ?? null;
 
-  const handleStatus = () => {
+  const handleStatus = async () => {
     if (!selectedPayment) return;
     if (selectedPayment.status === "Pending Invoice") {
-      updatePaymentStatus(selectedPayment.poId, "Ready for AP Posting");
+      await updatePaymentStatus(selectedPayment.id, "Ready for AP Posting");
     } else if (selectedPayment.status === "Ready for AP Posting") {
-      updatePaymentStatus(selectedPayment.poId, "Approved for Payment");
+      await updatePaymentStatus(selectedPayment.id, "Approved for Payment");
     } else if (selectedPayment.status === "Approved for Payment") {
-      updatePaymentStatus(selectedPayment.poId, "Paid");
+      await updatePaymentStatus(selectedPayment.id, "Paid");
     }
   };
 

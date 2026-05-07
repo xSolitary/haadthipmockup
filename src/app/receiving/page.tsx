@@ -31,9 +31,9 @@ export default function ReceivingPage() {
   const [coaMsds, setCoaMsds] = useState(true);
   const [qcRequired, setQcRequired] = useState(true);
 
-  const handleReceive = () => {
+  const handleReceive = async () => {
     if (!selectedOrder) return;
-    receivePo(selectedOrder.id, {
+    await receivePo(selectedOrder.id, {
       deliveryDate,
       receivedQty,
       condition,
@@ -150,7 +150,7 @@ export default function ReceivingPage() {
                   <p className="text-xs tracking-normal text-slate-400">สถานะ QC</p>
                   <p className="mt-2 text-base font-semibold text-slate-900">{existingRecord.qcStatus}</p>
                 </div>
-                <button type="button" onClick={() => selectedOrder && markQcPassed(selectedOrder.id)} className="inline-flex h-10 items-center rounded-xl bg-emerald-600 px-4 text-sm font-semibold text-white transition hover:bg-emerald-700">
+                <button type="button" onClick={() => selectedOrder && void markQcPassed(selectedOrder.id)} className="inline-flex h-10 items-center rounded-xl bg-emerald-600 px-4 text-sm font-semibold text-white transition hover:bg-emerald-700">
                   Mark QC Passed
                 </button>
               </div>

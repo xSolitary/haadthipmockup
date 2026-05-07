@@ -67,7 +67,6 @@ export function MemoEditorPage({ memoId }: { memoId?: string }) {
   const router = useRouter();
   const currentUserId = useProcurementStore((state) => state.currentUserId);
   const currentUser = useProcurementStore((state) => state.users.find((user) => user.id === currentUserId));
-  const memoCount = useProcurementStore((state) => state.memos.length);
   const memos = useProcurementStore((state) => state.memos);
   const createMemo = useProcurementStore((state) => state.createMemo);
   const updateMemo = useProcurementStore((state) => state.updateMemo);
@@ -97,6 +96,7 @@ export function MemoEditorPage({ memoId }: { memoId?: string }) {
   const [costCenter, setCostCenter] = useState(initialValues.costCenter);
   const [requiredDate, setRequiredDate] = useState(initialValues.requiredDate);
   const [items, setItems] = useState(initialValues.items);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const total = useMemo(
     () => items.reduce((sum, item) => sum + item.quantity * item.unitPrice, 0),
@@ -146,29 +146,42 @@ export function MemoEditorPage({ memoId }: { memoId?: string }) {
     requesterName: currentUser?.name ?? "ผู้ขอ",
   };
 
-  const handleSaveDraft = () => {
-    if (isEditing && editingMemo) {
-      updateMemo(editingMemo.id, payload);
-    } else {
-      createMemo(payload);
+  const handleSaveDraft = async () => {
+    if (isSubmitting) return;
+
+    setIsSubmitting(true);
+    try {
+      if (isEditing && editingMemo) {
+        await updateMemo(editingMemo.id, payload);
+      } else {
+        await createMemo(payload);
+      }
+      router.push("/my-requests");
+    } finally {
+      setIsSubmitting(false);
     }
-    router.push("/my-requests");
   };
 
-  const handleSubmit = () => {
-    if (isEditing && editingMemo) {
-      if (editingMemo.status === "Revision Required") {
-        resubmitMemo(editingMemo.id, payload);
+  const handleSubmit = async () => {
+    if (isSubmitting) return;
+
+    setIsSubmitting(true);
+    try {
+      if (isEditing && editingMemo) {
+        if (editingMemo.status === "Revision Required") {
+          await resubmitMemo(editingMemo.id, payload);
+        } else {
+          await updateMemo(editingMemo.id, payload);
+          await submitMemo(editingMemo.id);
+        }
       } else {
-        updateMemo(editingMemo.id, payload);
-        submitMemo(editingMemo.id);
+        const createdMemoId = await createMemo(payload);
+        await submitMemo(createdMemoId);
       }
-    } else {
-      const nextMemoId = `memo-${memoCount + 1}`;
-      createMemo(payload);
-      submitMemo(nextMemoId);
+      router.push("/my-requests");
+    } finally {
+      setIsSubmitting(false);
     }
-    router.push("/my-requests");
   };
 
   if (isEditing && (!editingMemo || !canEdit)) {
@@ -356,13 +369,13 @@ export function MemoEditorPage({ memoId }: { memoId?: string }) {
 
           <div className="rounded-[24px] border border-slate-200 bg-white p-6 shadow-sm shadow-slate-200/50">
             <div className="space-y-3">
-              <button type="button" onClick={handleSubmit} className="h-10 w-full rounded-xl bg-[#007946] px-4 text-sm font-semibold text-white transition hover:bg-[#005f37]">
-                {isRevision ? "Resubmit for Approval" : "Submit for Approval"}
+              <button type="button" onClick={handleSubmit} disabled={isSubmitting} className="h-10 w-full rounded-xl bg-[#007946] px-4 text-sm font-semibold text-white transition hover:bg-[#005f37] disabled:cursor-not-allowed disabled:opacity-60">
+                {isSubmitting ? "Processing..." : isRevision ? "Resubmit for Approval" : "Submit for Approval"}
               </button>
-              <button type="button" onClick={handleSaveDraft} className="h-10 w-full rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 transition hover:bg-slate-50">
-                {isEditing ? "Save Changes" : "Save Draft"}
+              <button type="button" onClick={handleSaveDraft} disabled={isSubmitting} className="h-10 w-full rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60">
+                {isSubmitting ? "Processing..." : isEditing ? "Save Changes" : "Save Draft"}
               </button>
-              <button type="button" onClick={() => router.push("/my-requests")} className="h-10 w-full rounded-xl bg-slate-100 px-4 text-sm font-semibold text-slate-700 transition hover:bg-slate-200">
+              <button type="button" onClick={() => router.push("/my-requests")} disabled={isSubmitting} className="h-10 w-full rounded-xl bg-slate-100 px-4 text-sm font-semibold text-slate-700 transition hover:bg-slate-200 disabled:cursor-not-allowed disabled:opacity-60">
                 Cancel
               </button>
             </div>

@@ -68,7 +68,7 @@ export function VendorProposalActionPage({ poId }: { poId: string }) {
     setProposalForm(emptyProposalForm);
   };
 
-  const handleSaveProposal = () => {
+  const handleSaveProposal = async () => {
     if (!purchaseOrder || !proposalForm.vendorName.trim()) return;
 
     const payload = {
@@ -84,9 +84,9 @@ export function VendorProposalActionPage({ poId }: { poId: string }) {
     };
 
     if (editingProposalId) {
-      updateVendorProposal(purchaseOrder.id, editingProposalId, payload);
+      await updateVendorProposal(purchaseOrder.id, editingProposalId, payload);
     } else {
-      addVendorProposal(purchaseOrder.id, payload);
+      await addVendorProposal(purchaseOrder.id, payload);
     }
 
     resetForm();
@@ -116,9 +116,9 @@ export function VendorProposalActionPage({ poId }: { poId: string }) {
     );
   };
 
-  const handleConfirmSelected = () => {
+  const handleConfirmSelected = async () => {
     if (!purchaseOrder || selectedProposalIds.length === 0) return;
-    submitVendorProposals(purchaseOrder.id, selectedProposalIds);
+    await submitVendorProposals(purchaseOrder.id, selectedProposalIds);
   };
 
   if (!purchaseOrder || (!canPurchasingAct && !canApproverAct)) {
@@ -234,7 +234,7 @@ export function VendorProposalActionPage({ poId }: { poId: string }) {
                             <button
                               type="button"
                               onClick={() => {
-                                deleteVendorProposal(purchaseOrder.id, proposal.id);
+                                void deleteVendorProposal(purchaseOrder.id, proposal.id);
                                 setSelectedProposalIds((current) => current.filter((id) => id !== proposal.id));
                               }}
                               className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-rose-200 bg-white text-rose-600 transition hover:bg-rose-50"
@@ -243,7 +243,7 @@ export function VendorProposalActionPage({ poId }: { poId: string }) {
                             </button>
                           </div>
                         ) : purchaseOrder.procurementStatus === "Pending Vendor Approval" ? (
-                          <button type="button" onClick={() => approveVendorSelection(purchaseOrder.id, proposal.id, approvalComment)} className="inline-flex h-10 items-center rounded-xl bg-[#007946] px-4 text-sm font-semibold text-white transition hover:bg-[#005f37]">
+                          <button type="button" onClick={() => void approveVendorSelection(purchaseOrder.id, proposal.id, approvalComment)} className="inline-flex h-10 items-center rounded-xl bg-[#007946] px-4 text-sm font-semibold text-white transition hover:bg-[#005f37]">
                             Confirm Vendor
                           </button>
                         ) : null}
