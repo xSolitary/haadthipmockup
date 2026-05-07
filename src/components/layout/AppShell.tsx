@@ -18,12 +18,12 @@ export function AppShell({ children }: AppShellProps) {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900">
+    <div className="min-h-screen bg-[#f6f8fa] text-slate-900">
       <div className="flex min-h-screen">
         <Sidebar />
         <div className="flex min-h-screen flex-1 flex-col">
           <Topbar />
-          <main className="flex-1 px-6 py-6 xl:px-10">
+          <main className="flex-1 px-4 py-5 sm:px-6 lg:px-8 xl:px-10">
             <div className="mx-auto w-full max-w-[1480px] pb-10">{children}</div>
           </main>
         </div>

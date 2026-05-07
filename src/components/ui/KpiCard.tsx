@@ -10,7 +10,7 @@ interface KpiCardProps {
 
 export function KpiCard({ label, value, trend, icon, badge }: KpiCardProps) {
   return (
-    <div className="flex h-32 flex-col justify-between rounded-lg border border-slate-200 bg-white p-5 shadow-sm shadow-slate-100">
+    <div className="flex min-h-32 flex-col justify-between rounded-[24px] border border-slate-200 bg-white p-5 shadow-sm shadow-slate-200/50">
       <div className="flex items-start justify-between gap-4">
         <div>
           <p className="text-xs font-medium text-slate-500 tracking-normal">{label}</p>

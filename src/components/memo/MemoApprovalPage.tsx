@@ -1,0 +1,210 @@
+"use client";
+
+import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import { CheckCircle2, RefreshCcw, XCircle } from "lucide-react";
+import { FormSection } from "@/components/ui/FormSection";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { StatusBadge } from "@/components/ui/StatusBadge";
+import { useProcurementStore } from "@/store/useProcurementStore";
+
+const formatCurrency = (value: number) =>
+  new Intl.NumberFormat("th-TH", { style: "currency", currency: "THB" }).format(value);
+
+export function MemoApprovalPage({ memoId }: { memoId: string }) {
+  const router = useRouter();
+  const currentUserId = useProcurementStore((state) => state.currentUserId);
+  const memos = useProcurementStore((state) => state.memos);
+  const approveMemo = useProcurementStore((state) => state.approveMemo);
+  const rejectMemo = useProcurementStore((state) => state.rejectMemo);
+  const requestRevision = useProcurementStore((state) => state.requestRevision);
+
+  const memo = useMemo(
+    () => memos.find((item) => item.id === memoId) ?? null,
+    [memoId, memos],
+  );
+  const [comment, setComment] = useState("");
+
+  const canAct =
+    memo &&
+    memo.status === "Pending Approval" &&
+    memo.assignedApproverId === currentUserId;
+
+  const handleAction = (action: "approve" | "revision" | "reject") => {
+    if (!memo) return;
+    if (action === "approve") approveMemo(memo.id, comment);
+    if (action === "revision") requestRevision(memo.id, comment);
+    if (action === "reject") rejectMemo(memo.id, comment);
+    router.push("/my-requests");
+  };
+
+  if (!memo || !canAct) {
+    return (
+      <div className="space-y-6">
+        <PageHeader title="Memo Approval" subtitle="ไม่สามารถดำเนินการกับ Memo รายการนี้ได้" />
+        <div className="rounded-[24px] border border-slate-200 bg-white p-6 shadow-sm shadow-slate-200/50">
+          <p className="text-sm text-slate-600">Memo นี้ต้องอยู่ในสถานะ Pending Approval และต้องถูกมอบหมายให้ approver คนปัจจุบัน</p>
+          <button
+            type="button"
+            onClick={() => router.push("/my-requests")}
+            className="mt-4 inline-flex h-10 items-center rounded-xl bg-[#007946] px-4 text-sm font-semibold text-white transition hover:bg-[#005f37]"
+          >
+            กลับไป Procure-to-Pay
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      <PageHeader title="Approve Memo" subtitle="ตรวจสอบข้อมูล Memo แบบเต็มหน้าและตัดสินใจอนุมัติได้โดยไม่ใช้ modal" />
+      <div className="grid gap-6 xl:grid-cols-[2fr_1fr]">
+        <div className="space-y-6">
+          <FormSection title="ข้อมูลผู้ขอ" description="รายละเอียดผู้ขอและหน่วยงานที่เกี่ยวข้อง">
+            <div className="grid gap-4 md:grid-cols-2">
+              <label className="space-y-2 text-sm text-slate-700">
+                ชื่อผู้ขอ
+                <input readOnly value={memo.requesterName} className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 text-sm text-slate-900" />
+              </label>
+              <label className="space-y-2 text-sm text-slate-700">
+                ฝ่ายงาน
+                <input readOnly value={memo.department} className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 text-sm text-slate-900" />
+              </label>
+              <label className="space-y-2 text-sm text-slate-700">
+                ไซต์ / โรงงาน
+                <input readOnly value={memo.site} className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 text-sm text-slate-900" />
+              </label>
+              <label className="space-y-2 text-sm text-slate-700">
+                Cost Center
+                <input readOnly value={memo.costCenter} className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 text-sm text-slate-900" />
+              </label>
+              <label className="space-y-2 text-sm text-slate-700">
+                วันที่ขอ
+                <input readOnly value={memo.requestDate} className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 text-sm text-slate-900" />
+              </label>
+              <label className="space-y-2 text-sm text-slate-700">
+                วันที่ต้องการ
+                <input readOnly value={memo.requiredDate} className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 text-sm text-slate-900" />
+              </label>
+            </div>
+          </FormSection>
+
+          <FormSection title="รายละเอียดคำขอ" description="รายละเอียดคำขอที่ผู้ใช้ส่งมาเพื่อรอการอนุมัติ">
+            <div className="space-y-4">
+              <label className="space-y-2 text-sm text-slate-700">
+                หัวข้อ Memo
+                <input readOnly value={memo.title} className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 text-sm text-slate-900" />
+              </label>
+              <div className="grid gap-4 md:grid-cols-2">
+                <label className="space-y-2 text-sm text-slate-700">
+                  หมวดการจัดซื้อ
+                  <input readOnly value={memo.category} className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 text-sm text-slate-900" />
+                </label>
+                <label className="space-y-2 text-sm text-slate-700">
+                  ความเร่งด่วน
+                  <input readOnly value={memo.urgency} className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 text-sm text-slate-900" />
+                </label>
+              </div>
+              <label className="space-y-2 text-sm text-slate-700">
+                วัตถุประสงค์ / เหตุผล
+                <textarea readOnly value={memo.purpose} rows={4} className="w-full rounded-[20px] border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900"></textarea>
+              </label>
+              <div className="grid gap-4 md:grid-cols-2">
+                <label className="space-y-2 text-sm text-slate-700">
+                  รหัสงบประมาณ
+                  <input readOnly value={memo.budgetCode} className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 text-sm text-slate-900" />
+                </label>
+                <label className="space-y-2 text-sm text-slate-700">
+                  สถานที่จัดส่ง
+                  <input readOnly value={memo.deliveryLocation} className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 text-sm text-slate-900" />
+                </label>
+              </div>
+            </div>
+          </FormSection>
+
+          <FormSection title="รายการสินค้า / บริการ" description="รายการที่ร้องขอใน Memo นี้">
+            <div className="space-y-4">
+              {memo.items.map((item) => (
+                <div key={item.id} className="rounded-[20px] border border-slate-200 bg-slate-50 p-4">
+                  <div className="grid gap-4 md:grid-cols-[2fr_1fr_1fr]">
+                    <div>
+                      <p className="text-sm text-slate-500">ชื่อสินค้า</p>
+                      <p className="mt-2 font-semibold text-slate-900">{item.name}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-slate-500">จำนวน</p>
+                      <p className="mt-2 font-semibold text-slate-900">{item.quantity.toLocaleString()} {item.unit}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-slate-500">ราคา/หน่วย</p>
+                      <p className="mt-2 font-semibold text-slate-900">{formatCurrency(item.unitPrice)}</p>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </FormSection>
+        </div>
+
+        <aside className="space-y-6">
+          <div className="rounded-[24px] border border-slate-200 bg-white p-6 shadow-sm shadow-slate-200/50">
+            <h2 className="text-lg font-semibold text-slate-900">สรุปคำขอ</h2>
+            <div className="mt-5 space-y-4">
+              <div className="rounded-[20px] border border-slate-200 bg-slate-50 p-4">
+                <p className="text-sm text-slate-500">เลขที่เอกสาร</p>
+                <p className="mt-2 font-semibold text-slate-900">{memo.documentNumber}</p>
+              </div>
+              <div className="rounded-[20px] border border-slate-200 bg-slate-50 p-4">
+                <p className="text-sm text-slate-500">สถานะ</p>
+                <div className="mt-2"><StatusBadge label={memo.status} /></div>
+              </div>
+              <div className="rounded-[20px] border border-slate-200 bg-slate-50 p-4">
+                <p className="text-sm text-slate-500">ยอดรวมประมาณการ</p>
+                <p className="mt-2 text-2xl font-semibold text-slate-900">{formatCurrency(memo.estimatedTotal)}</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="rounded-[24px] border border-slate-200 bg-white p-6 shadow-sm shadow-slate-200/50">
+            <h2 className="text-lg font-semibold text-slate-900">Approval Decision</h2>
+            <textarea
+              value={comment}
+              onChange={(event) => setComment(event.target.value)}
+              rows={5}
+              placeholder="ใส่หมายเหตุประกอบการตัดสินใจ"
+              className="mt-4 w-full rounded-[20px] border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900"
+            />
+            <div className="mt-4 space-y-3">
+              <button type="button" onClick={() => handleAction("approve")} className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 text-sm font-semibold text-white transition hover:bg-emerald-700">
+                <CheckCircle2 className="h-4 w-4" /> Approve
+              </button>
+              <button type="button" onClick={() => handleAction("revision")} className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-xl bg-amber-500 px-4 text-sm font-semibold text-white transition hover:bg-amber-600">
+                <RefreshCcw className="h-4 w-4" /> Request Revision
+              </button>
+              <button type="button" onClick={() => handleAction("reject")} className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-xl bg-rose-600 px-4 text-sm font-semibold text-white transition hover:bg-rose-700">
+                <XCircle className="h-4 w-4" /> Reject
+              </button>
+            </div>
+          </div>
+
+          <div className="rounded-[24px] border border-slate-200 bg-white p-6 shadow-sm shadow-slate-200/50">
+            <h2 className="text-lg font-semibold text-slate-900">History</h2>
+            <div className="mt-4 space-y-3">
+              {memo.history.slice().reverse().map((entry, index) => (
+                <div key={`${entry.id}-${entry.date}-${entry.action}-${entry.actorId}-${index}`} className="rounded-[20px] border border-slate-200 bg-slate-50 p-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="font-semibold text-slate-900">{entry.actionLabelTh}</p>
+                    <span className="text-xs text-slate-400">{entry.date.slice(0, 10)}</span>
+                  </div>
+                  <p className="mt-2 text-sm text-slate-600">{entry.comment}</p>
+                  <p className="mt-2 text-xs text-slate-500">{entry.actorName} • {entry.role}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </aside>
+      </div>
+    </div>
+  );
+}

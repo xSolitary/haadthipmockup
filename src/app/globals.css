@@ -1,7 +1,7 @@
 @import "tailwindcss";
 
 :root {
-  --background: #f8fafc;
+  --background: #f6f8fa;
   --foreground: #0f172a;
   --surface: #ffffff;
   --surface-muted: #f8fafc;
@@ -9,6 +9,7 @@
   --primary: #007946;
   --primary-strong: #005c37;
   --primary-light: #f0f9f6;
+  --ring: rgba(0, 121, 70, 0.14);
 }
 
 @theme inline {
@@ -25,7 +26,9 @@ html {
 body {
   min-height: 100vh;
   margin: 0;
-  background: var(--background);
+  background:
+    radial-gradient(circle at top, rgba(0, 121, 70, 0.05), transparent 28%),
+    var(--background);
   color: var(--foreground);
   font-family: "Inter", "Noto Sans Thai", "Sarabun", system-ui, sans-serif;
   letter-spacing: normal;
@@ -44,6 +47,32 @@ input,
 textarea,
 select {
   font: inherit;
+}
+
+button,
+a,
+input,
+textarea,
+select {
+  transition:
+    color 160ms ease,
+    background-color 160ms ease,
+    border-color 160ms ease,
+    box-shadow 160ms ease,
+    transform 160ms ease;
+}
+
+input,
+textarea,
+select {
+  outline: none;
+}
+
+input:focus,
+textarea:focus,
+select:focus {
+  border-color: rgba(0, 121, 70, 0.35);
+  box-shadow: 0 0 0 4px var(--ring);
 }
 
 * {

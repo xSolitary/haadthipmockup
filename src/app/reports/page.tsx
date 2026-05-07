@@ -6,7 +6,7 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { useProcurementStore } from "@/store/useProcurementStore";
 import { KpiCard } from "@/components/ui/KpiCard";
 
-const COLORS = ["#0f62fe", "#10b981", "#f59e0b", "#8b5cf6", "#ec4899"];
+const COLORS = ["#007946", "#10b981", "#0f766e", "#f59e0b", "#2563eb"];
 
 const formatCurrency = (value: number) =>
   new Intl.NumberFormat("th-TH", { style: "currency", currency: "THB", maximumFractionDigits: 0 }).format(value);
@@ -45,7 +45,7 @@ export default function ReportsPage() {
         <KpiCard label="On-time Delivery" value={`${averageVendorOnTime}%`} badge="Vendor KPI" />
       </div>
       <div className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
-        <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm shadow-slate-100">
+        <div className="rounded-[24px] border border-slate-200 bg-white p-5 shadow-sm shadow-slate-200/50 sm:p-6">
           <h2 className="text-lg font-semibold text-slate-900">Spend by Category</h2>
           <p className="mt-2 text-sm text-slate-500">จัดอันดับหมวดหมู่ตามยอดใช้งบประมาณรวม</p>
           <div className="mt-6 h-72">
@@ -55,12 +55,12 @@ export default function ReportsPage() {
                 <XAxis dataKey="name" tickLine={false} axisLine={false} />
                 <YAxis tickLine={false} axisLine={false} tickFormatter={(value) => `${Math.round(value / 1000)}k`} />
                 <Tooltip formatter={(value) => formatCurrency(Number(value))} />
-                <Bar dataKey="value" fill="#0f62fe" radius={[8, 8, 0, 0]} />
+                <Bar dataKey="value" fill="#007946" radius={[8, 8, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>
         </div>
-        <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm shadow-slate-100">
+        <div className="rounded-[24px] border border-slate-200 bg-white p-5 shadow-sm shadow-slate-200/50 sm:p-6">
           <h2 className="text-lg font-semibold text-slate-900">Spend by Site / Plant</h2>
           <p className="mt-2 text-sm text-slate-500">สรุปค่าใช้จ่ายตามไซต์และโรงงาน</p>
           <div className="mt-6 h-72">
@@ -78,17 +78,17 @@ export default function ReportsPage() {
         </div>
       </div>
       <div className="grid gap-6 xl:grid-cols-[1fr_1fr_1fr]">
-        <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm shadow-slate-100">
+        <div className="rounded-[24px] border border-slate-200 bg-white p-5 shadow-sm shadow-slate-200/50 sm:p-6">
           <h3 className="text-sm font-semibold tracking-normal text-slate-400">Vendor On-time Delivery</h3>
           <p className="mt-4 text-3xl font-semibold text-slate-900">{averageVendorOnTime}%</p>
           <p className="mt-3 text-sm text-slate-500">สัดส่วนการส่งมอบตรงเวลาในไตรมาสที่ผ่านมา</p>
         </div>
-        <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm shadow-slate-100">
+        <div className="rounded-[24px] border border-slate-200 bg-white p-5 shadow-sm shadow-slate-200/50 sm:p-6">
           <h3 className="text-sm font-semibold tracking-normal text-slate-400">Emergency Count</h3>
           <p className="mt-4 text-3xl font-semibold text-slate-900">{emergencyCount}</p>
           <p className="mt-3 text-sm text-slate-500">จำนวน Memo ด่วนที่บันทึกในระบบ</p>
         </div>
-        <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm shadow-slate-100">
+        <div className="rounded-[24px] border border-slate-200 bg-white p-5 shadow-sm shadow-slate-200/50 sm:p-6">
           <h3 className="text-sm font-semibold tracking-normal text-slate-400">Budget Utilization</h3>
           <p className="mt-4 text-3xl font-semibold text-slate-900">{Math.round((approvedSpend / 1200000) * 100)}%</p>
           <p className="mt-3 text-sm text-slate-500">เทียบกับงบประมาณทั้งปี</p>

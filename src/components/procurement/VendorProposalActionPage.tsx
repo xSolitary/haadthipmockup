@@ -1,0 +1,323 @@
+"use client";
+
+import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import { Check, Pencil, Plus, Trash2 } from "lucide-react";
+import { FormSection } from "@/components/ui/FormSection";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { StatusBadge } from "@/components/ui/StatusBadge";
+import { useProcurementStore } from "@/store/useProcurementStore";
+
+const formatCurrency = (value: number) =>
+  new Intl.NumberFormat("th-TH", { style: "currency", currency: "THB", maximumFractionDigits: 0 }).format(value);
+
+const emptyProposalForm = {
+  vendorName: "",
+  quotedPrice: "",
+  leadTime: "",
+  paymentTerms: "",
+  notes: "",
+  attachmentName: "",
+  attachmentUrl: "",
+};
+
+export function VendorProposalActionPage({ poId }: { poId: string }) {
+  const router = useRouter();
+  const currentRole = useProcurementStore((state) => state.currentRole);
+  const currentUserId = useProcurementStore((state) => state.currentUserId);
+  const purchaseOrders = useProcurementStore((state) => state.purchaseOrders);
+  const memos = useProcurementStore((state) => state.memos);
+  const addVendorProposal = useProcurementStore((state) => state.addVendorProposal);
+  const updateVendorProposal = useProcurementStore((state) => state.updateVendorProposal);
+  const deleteVendorProposal = useProcurementStore((state) => state.deleteVendorProposal);
+  const submitVendorProposals = useProcurementStore((state) => state.submitVendorProposals);
+  const approveVendorSelection = useProcurementStore((state) => state.approveVendorSelection);
+
+  const purchaseOrder = useMemo(
+    () => purchaseOrders.find((po) => po.id === poId) ?? null,
+    [poId, purchaseOrders],
+  );
+  const sourceMemo = useMemo(
+    () => (purchaseOrder ? memos.find((memo) => memo.id === purchaseOrder.memoId) ?? null : null),
+    [memos, purchaseOrder],
+  );
+
+  const canPurchasingAct = currentRole === "Purchasing" && Boolean(purchaseOrder);
+  const canApproverAct =
+    currentRole === "Approver" &&
+    Boolean(purchaseOrder) &&
+    sourceMemo?.assignedApproverId === currentUserId;
+
+  const [editingProposalId, setEditingProposalId] = useState<string | null>(null);
+  const [approvalComment, setApprovalComment] = useState("");
+  const [selectedProposalIds, setSelectedProposalIds] = useState<string[]>(
+    () =>
+      purchaseOrder?.vendorProposals
+        .filter((proposal) => proposal.submittedToApprover)
+        .map((proposal) => proposal.id) ?? [],
+  );
+  const [proposalForm, setProposalForm] = useState(emptyProposalForm);
+
+  const submittedProposals = useMemo(
+    () => purchaseOrder?.vendorProposals.filter((proposal) => proposal.submittedToApprover) ?? [],
+    [purchaseOrder],
+  );
+
+  const resetForm = () => {
+    setEditingProposalId(null);
+    setProposalForm(emptyProposalForm);
+  };
+
+  const handleSaveProposal = () => {
+    if (!purchaseOrder || !proposalForm.vendorName.trim()) return;
+
+    const payload = {
+      vendorId: null,
+      vendorName: proposalForm.vendorName.trim(),
+      quotedPrice: Number(proposalForm.quotedPrice || 0),
+      leadTime: proposalForm.leadTime.trim() || "-",
+      paymentTerms: proposalForm.paymentTerms.trim() || "-",
+      notes: proposalForm.notes.trim() || "-",
+      attachmentName: proposalForm.attachmentName.trim() || undefined,
+      attachmentUrl: proposalForm.attachmentUrl.trim() || undefined,
+      submittedToApprover: false,
+    };
+
+    if (editingProposalId) {
+      updateVendorProposal(purchaseOrder.id, editingProposalId, payload);
+    } else {
+      addVendorProposal(purchaseOrder.id, payload);
+    }
+
+    resetForm();
+  };
+
+  const handleEditProposal = (proposalId: string) => {
+    const proposal = purchaseOrder?.vendorProposals.find((item) => item.id === proposalId);
+    if (!proposal) return;
+
+    setEditingProposalId(proposal.id);
+    setProposalForm({
+      vendorName: proposal.vendorName,
+      quotedPrice: String(proposal.quotedPrice),
+      leadTime: proposal.leadTime,
+      paymentTerms: proposal.paymentTerms,
+      notes: proposal.notes,
+      attachmentName: proposal.attachmentName ?? "",
+      attachmentUrl: proposal.attachmentUrl ?? "",
+    });
+  };
+
+  const toggleSelectedProposal = (proposalId: string) => {
+    setSelectedProposalIds((current) =>
+      current.includes(proposalId)
+        ? current.filter((id) => id !== proposalId)
+        : [...current, proposalId],
+    );
+  };
+
+  const handleConfirmSelected = () => {
+    if (!purchaseOrder || selectedProposalIds.length === 0) return;
+    submitVendorProposals(purchaseOrder.id, selectedProposalIds);
+  };
+
+  if (!purchaseOrder || (!canPurchasingAct && !canApproverAct)) {
+    return (
+      <div className="space-y-6">
+        <PageHeader title="PR Action" subtitle="ไม่สามารถเข้าถึงหน้าดำเนินการ PR รายการนี้ได้" />
+        <div className="rounded-[24px] border border-slate-200 bg-white p-6 shadow-sm shadow-slate-200/50">
+          <p className="text-sm text-slate-600">หน้านี้สำหรับ Purchasing เพื่อจัดการ vendor proposal และสำหรับ Approver เพื่อยืนยัน vendor เท่านั้น</p>
+          <button
+            type="button"
+            onClick={() => router.push("/my-requests")}
+            className="mt-4 inline-flex h-10 items-center rounded-xl bg-[#007946] px-4 text-sm font-semibold text-white transition hover:bg-[#005f37]"
+          >
+            กลับไป Procure-to-Pay
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      <PageHeader
+        title={canPurchasingAct ? "Manage Vendor Proposals" : "Approve Vendor Selection"}
+        subtitle="จัดการรายการ vendor options แบบเต็มหน้า โดยเก็บสถานะเดิมไว้ใน localStorage"
+      />
+      <div className="grid gap-6 xl:grid-cols-[2fr_1fr]">
+        <div className="space-y-6">
+          <FormSection title="PR Summary" description="รายละเอียดคำขอที่กำลังอยู่ในขั้นตอน vendor selection">
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="rounded-[20px] border border-slate-200 bg-slate-50 p-4">
+                <p className="text-sm text-slate-500">PR Number</p>
+                <p className="mt-2 font-semibold text-slate-900">{purchaseOrder.prNumber ?? purchaseOrder.documentNumber}</p>
+              </div>
+              <div className="rounded-[20px] border border-slate-200 bg-slate-50 p-4">
+                <p className="text-sm text-slate-500">Status</p>
+                <div className="mt-2"><StatusBadge label={purchaseOrder.procurementStatus} /></div>
+              </div>
+              <div className="rounded-[20px] border border-slate-200 bg-slate-50 p-4 md:col-span-2">
+                <p className="text-sm text-slate-500">Memo Title</p>
+                <p className="mt-2 font-semibold text-slate-900">{purchaseOrder.memoTitle}</p>
+              </div>
+            </div>
+          </FormSection>
+
+          {canPurchasingAct ? (
+            <FormSection title="Vendor Proposal Form" description="เพิ่มหรือแก้ไข vendor option ก่อนส่งให้ approver">
+              <div className="grid gap-4 md:grid-cols-2">
+                <input value={proposalForm.vendorName} onChange={(event) => setProposalForm((current) => ({ ...current, vendorName: event.target.value }))} placeholder="Vendor name" className="h-11 rounded-xl border border-slate-200 bg-white px-4 text-sm text-slate-900" />
+                <input type="number" min={0} value={proposalForm.quotedPrice} onChange={(event) => setProposalForm((current) => ({ ...current, quotedPrice: event.target.value }))} placeholder="Quoted price" className="h-11 rounded-xl border border-slate-200 bg-white px-4 text-sm text-slate-900" />
+                <input value={proposalForm.leadTime} onChange={(event) => setProposalForm((current) => ({ ...current, leadTime: event.target.value }))} placeholder="Lead time" className="h-11 rounded-xl border border-slate-200 bg-white px-4 text-sm text-slate-900" />
+                <input value={proposalForm.paymentTerms} onChange={(event) => setProposalForm((current) => ({ ...current, paymentTerms: event.target.value }))} placeholder="Payment terms" className="h-11 rounded-xl border border-slate-200 bg-white px-4 text-sm text-slate-900" />
+                <input value={proposalForm.attachmentName} onChange={(event) => setProposalForm((current) => ({ ...current, attachmentName: event.target.value }))} placeholder="Attachment name" className="h-11 rounded-xl border border-slate-200 bg-white px-4 text-sm text-slate-900" />
+                <input value={proposalForm.attachmentUrl} onChange={(event) => setProposalForm((current) => ({ ...current, attachmentUrl: event.target.value }))} placeholder="Attachment URL" className="h-11 rounded-xl border border-slate-200 bg-white px-4 text-sm text-slate-900" />
+                <textarea value={proposalForm.notes} onChange={(event) => setProposalForm((current) => ({ ...current, notes: event.target.value }))} placeholder="Notes" rows={3} className="md:col-span-2 rounded-[20px] border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900" />
+              </div>
+              <div className="mt-4 flex flex-wrap gap-3">
+                <button type="button" onClick={handleSaveProposal} className="inline-flex h-10 items-center gap-2 rounded-xl bg-[#007946] px-4 text-sm font-semibold text-white transition hover:bg-[#005f37]">
+                  {editingProposalId ? <Check className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
+                  {editingProposalId ? "Update Proposal" : "Add Proposal"}
+                </button>
+                {editingProposalId ? (
+                  <button type="button" onClick={resetForm} className="inline-flex h-10 items-center rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 transition hover:bg-slate-50">
+                    Cancel Edit
+                  </button>
+                ) : null}
+              </div>
+            </FormSection>
+          ) : null}
+
+          <FormSection
+            title={canPurchasingAct ? "Vendor Options" : "Submitted Vendor Options"}
+            description={canPurchasingAct ? "เลือกหลาย vendor ด้วย checkbox แล้วกดยืนยันเพื่อส่งให้ approver" : "approver จะเห็นเฉพาะ vendor options ที่ purchasing ส่งเข้ามา"}
+          >
+            <div className="space-y-4">
+              {(canPurchasingAct ? purchaseOrder.vendorProposals : submittedProposals).length === 0 ? (
+                <p className="rounded-[20px] border border-dashed border-slate-200 bg-slate-50 px-4 py-8 text-center text-sm text-slate-500">
+                  {canPurchasingAct ? "ยังไม่มี vendor proposal" : "ยังไม่มี vendor ที่ถูกส่งมาให้อนุมัติ"}
+                </p>
+              ) : (
+                (canPurchasingAct ? purchaseOrder.vendorProposals : submittedProposals).map((proposal) => (
+                  <div key={proposal.id} className="rounded-[20px] border border-slate-200 bg-slate-50 p-4">
+                    <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                      <div className="flex-1">
+                        {canPurchasingAct ? (
+                          <label className="inline-flex items-center gap-3 text-sm font-medium text-slate-700">
+                            <input
+                              type="checkbox"
+                              checked={selectedProposalIds.includes(proposal.id)}
+                              onChange={() => toggleSelectedProposal(proposal.id)}
+                              className="h-4 w-4 rounded border-slate-300 text-[#007946]"
+                            />
+                            ส่ง vendor นี้ให้ approver
+                          </label>
+                        ) : null}
+                        <p className="mt-3 text-lg font-semibold text-slate-900">{proposal.vendorName}</p>
+                        <p className="mt-1 text-sm text-slate-500">Lead time: {proposal.leadTime} • Terms: {proposal.paymentTerms}</p>
+                        <p className="mt-2 text-sm text-slate-600">{proposal.notes}</p>
+                        {proposal.attachmentName ? (
+                          <p className="mt-2 text-sm text-sky-700">
+                            Attachment: {proposal.attachmentName}
+                            {proposal.attachmentUrl ? ` (${proposal.attachmentUrl})` : ""}
+                          </p>
+                        ) : null}
+                      </div>
+                      <div className="flex flex-col items-start gap-3 lg:items-end">
+                        <p className="text-xl font-semibold text-slate-900">{formatCurrency(proposal.quotedPrice)}</p>
+                        {canPurchasingAct ? (
+                          <div className="flex gap-2">
+                            <button type="button" onClick={() => handleEditProposal(proposal.id)} className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 transition hover:border-[#007946]/20 hover:bg-[#f0f9f6] hover:text-[#007946]">
+                              <Pencil className="h-4 w-4" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                deleteVendorProposal(purchaseOrder.id, proposal.id);
+                                setSelectedProposalIds((current) => current.filter((id) => id !== proposal.id));
+                              }}
+                              className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-rose-200 bg-white text-rose-600 transition hover:bg-rose-50"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          </div>
+                        ) : purchaseOrder.procurementStatus === "Pending Vendor Approval" ? (
+                          <button type="button" onClick={() => approveVendorSelection(purchaseOrder.id, proposal.id, approvalComment)} className="inline-flex h-10 items-center rounded-xl bg-[#007946] px-4 text-sm font-semibold text-white transition hover:bg-[#005f37]">
+                            Confirm Vendor
+                          </button>
+                        ) : null}
+                      </div>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </FormSection>
+        </div>
+
+        <aside className="space-y-6">
+          <div className="rounded-[24px] border border-slate-200 bg-white p-6 shadow-sm shadow-slate-200/50">
+            <h2 className="text-lg font-semibold text-slate-900">Selection Summary</h2>
+            <div className="mt-5 space-y-4">
+              <div className="rounded-[20px] border border-slate-200 bg-slate-50 p-4">
+                <p className="text-sm text-slate-500">Submitted to Approver</p>
+                <p className="mt-2 text-2xl font-semibold text-slate-900">{submittedProposals.length}</p>
+              </div>
+              <div className="rounded-[20px] border border-slate-200 bg-slate-50 p-4">
+                <p className="text-sm text-slate-500">Total Options</p>
+                <p className="mt-2 text-2xl font-semibold text-slate-900">{purchaseOrder.vendorProposals.length}</p>
+              </div>
+              <div className="rounded-[20px] border border-slate-200 bg-slate-50 p-4">
+                <p className="text-sm text-slate-500">Current Status</p>
+                <div className="mt-2"><StatusBadge label={purchaseOrder.procurementStatus} /></div>
+              </div>
+            </div>
+          </div>
+
+          {canPurchasingAct ? (
+            <div className="rounded-[24px] border border-slate-200 bg-white p-6 shadow-sm shadow-slate-200/50">
+              <h2 className="text-lg font-semibold text-slate-900">Send to Approver</h2>
+              <p className="mt-2 text-sm text-slate-500">เลือก vendor ที่ต้องการส่งต่อ แล้วกดยืนยันเพื่อเปลี่ยนสถานะเป็น Pending Vendor Approval</p>
+              <button
+                type="button"
+                onClick={handleConfirmSelected}
+                disabled={selectedProposalIds.length === 0}
+                className="mt-4 inline-flex h-10 w-full items-center justify-center rounded-xl bg-slate-900 px-4 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300"
+              >
+                Confirm Selected Vendors
+              </button>
+            </div>
+          ) : (
+            <div className="rounded-[24px] border border-slate-200 bg-white p-6 shadow-sm shadow-slate-200/50">
+              <h2 className="text-lg font-semibold text-slate-900">Approval Comment</h2>
+              <textarea
+                value={approvalComment}
+                onChange={(event) => setApprovalComment(event.target.value)}
+                rows={5}
+                placeholder="หมายเหตุประกอบการยืนยัน vendor"
+                className="mt-4 w-full rounded-[20px] border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900"
+              />
+            </div>
+          )}
+
+          <div className="rounded-[24px] border border-slate-200 bg-white p-6 shadow-sm shadow-slate-200/50">
+            <h2 className="text-lg font-semibold text-slate-900">History</h2>
+            <div className="mt-4 space-y-3">
+              {purchaseOrder.history.slice().reverse().map((entry, index) => (
+                <div key={`${entry.id}-${entry.date}-${entry.action}-${entry.actorId}-${index}`} className="rounded-[20px] border border-slate-200 bg-slate-50 p-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="font-semibold text-slate-900">{entry.actionLabelTh}</p>
+                    <span className="text-xs text-slate-400">{entry.date.slice(0, 10)}</span>
+                  </div>
+                  <p className="mt-2 text-sm text-slate-600">{entry.comment}</p>
+                  <p className="mt-2 text-xs text-slate-500">{entry.actorName} • {entry.role}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </aside>
+      </div>
+    </div>
+  );
+}

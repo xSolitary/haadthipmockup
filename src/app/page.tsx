@@ -8,7 +8,7 @@ import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
 import { useProcurementStore } from "@/store/useProcurementStore";
 
 const chartColors = ["#007946", "#0f766e", "#2563eb", "#f59e0b", "#dc2626", "#7c3aed", "#ea580c", "#0891b2"];
-const cardClassName = "rounded-3xl border border-slate-200 bg-white shadow-sm shadow-slate-100";
+const cardClassName = "rounded-[24px] border border-slate-200 bg-white shadow-sm shadow-slate-200/50";
 
 const formatCurrency = (value: number) =>
   new Intl.NumberFormat("th-TH", { style: "currency", currency: "THB", maximumFractionDigits: 0 }).format(value);
@@ -170,7 +170,7 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-6 text-slate-900">
-      <section className={`${cardClassName} px-6 py-6`}>
+      <section className={`${cardClassName} px-5 py-5 sm:px-6`}>
         <div className="flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
           <div className="max-w-3xl">
             <p className="text-sm font-medium tracking-normal text-[#007946]">Dashboard</p>
@@ -181,7 +181,7 @@ export default function DashboardPage() {
           </div>
 
           <div className="grid gap-3 sm:grid-cols-[auto_1fr_1fr] sm:items-center">
-            <div className="inline-flex h-12 items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-4 text-sm font-medium tracking-normal text-slate-600">
+            <div className="inline-flex h-10 items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-4 text-sm font-medium tracking-normal text-slate-600">
               <CalendarRange className="h-4 w-4 text-[#007946]" />
               Date Range
             </div>
@@ -190,14 +190,14 @@ export default function DashboardPage() {
               value={startDate}
               max={endDate}
               onChange={(event) => setStartDate(event.target.value)}
-              className="h-12 rounded-2xl border border-slate-200 bg-white px-4 text-sm font-medium tracking-normal text-slate-700 outline-none transition focus:border-[#007946] focus:ring-2 focus:ring-[#007946]/10"
+              className="h-10 rounded-xl border border-slate-200 bg-white px-4 text-sm font-medium tracking-normal text-slate-700"
             />
             <input
               type="date"
               value={endDate}
               min={startDate}
               onChange={(event) => setEndDate(event.target.value)}
-              className="h-12 rounded-2xl border border-slate-200 bg-white px-4 text-sm font-medium tracking-normal text-slate-700 outline-none transition focus:border-[#007946] focus:ring-2 focus:ring-[#007946]/10"
+              className="h-10 rounded-xl border border-slate-200 bg-white px-4 text-sm font-medium tracking-normal text-slate-700"
             />
           </div>
         </div>
@@ -267,7 +267,7 @@ export default function DashboardPage() {
             </p>
           </div>
 
-          <div className="mt-6 rounded-[28px] border border-slate-200 bg-slate-50 p-5">
+          <div className="mt-6 rounded-[24px] border border-slate-200 bg-slate-50 p-5">
             <div className="h-[320px]">
               {isChartReady ? (
                 pieData.length > 0 ? (

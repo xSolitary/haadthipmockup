@@ -81,6 +81,7 @@ export interface ApprovalHistory {
     | "Rejected"
     | "Revision Required"
     | "Submitted"
+    | "Resubmitted"
     | "Draft Saved"
     | "Vendor Proposed"
     | "Submitted for Vendor Approval"
@@ -100,6 +101,7 @@ export interface VendorProposal {
   notes: string;
   attachmentName?: string;
   attachmentUrl?: string;
+  submittedToApprover?: boolean;
   proposedById: string;
   proposedByName: string;
   createdAt: string;
@@ -243,13 +245,17 @@ export interface ProcurementState extends CurrentStoreState {
   switchRole: (role: Role) => void;
   createMemo: (memo: Omit<MemoRequest, "id" | "documentNumber" | "createdAt" | "updatedAt" | "history" | "procurementStatus" | "status" | "assignedApproverId" | "currentApproverName" | "estimatedTotal">) => void;
   saveDraft: (memoId: string, updates: Partial<MemoRequest>) => void;
+  updateMemo: (memoId: string, updates: Partial<MemoRequest>) => void;
   submitMemo: (memoId: string) => void;
+  resubmitMemo: (memoId: string, updates: Partial<MemoRequest>) => void;
   approveMemo: (memoId: string, comment: string) => void;
   rejectMemo: (memoId: string, comment: string) => void;
   requestRevision: (memoId: string, comment: string) => void;
   createPR: (memoId: string) => void;
   addVendorProposal: (poId: string, proposal: Omit<VendorProposal, "id" | "proposedById" | "proposedByName" | "createdAt">) => void;
-  submitVendorProposals: (poId: string) => void;
+  updateVendorProposal: (poId: string, proposalId: string, updates: Partial<VendorProposal>) => void;
+  deleteVendorProposal: (poId: string, proposalId: string) => void;
+  submitVendorProposals: (poId: string, proposalIds: string[]) => void;
   approveVendorSelection: (poId: string, proposalId: string, comment: string) => void;
   selectVendor: (poId: string, vendorId: string) => void;
   sendPOForApproval: (poId: string) => void;

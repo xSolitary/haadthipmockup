@@ -44,7 +44,7 @@ const createHistoryEntry = (
   action: ApprovalHistory["action"],
   comment: string,
 ): ApprovalHistory => ({
-  id: `hist-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+  id: `hist-${crypto.randomUUID()}`,
   documentId,
   documentNumber,
   documentType,
@@ -63,6 +63,8 @@ const createHistoryEntry = (
           ? "ขอแก้ไข"
           : action === "Submitted"
             ? "ส่งขออนุมัติ"
+            : action === "Resubmitted"
+              ? "ส่งแก้ไขใหม่"
             : action === "Vendor Proposed"
               ? "เสนอ vendor"
               : action === "Submitted for Vendor Approval"
@@ -93,10 +95,22 @@ function normalizePurchaseOrder(po: PurchaseOrder, receiving?: ReceivingRecord):
 
   return {
     ...po,
-    vendorProposals: po.vendorProposals ?? [],
+    vendorProposals: (po.vendorProposals ?? []).map((proposal) => ({
+      ...proposal,
+      submittedToApprover: proposal.submittedToApprover ?? false,
+    })),
     history: po.history ?? [],
     selectedVendorName: po.selectedVendorName ?? po.vendorName,
     procurementStatus,
+  };
+}
+
+function updateMemoFields(memo: MemoRequest, updates: Partial<MemoRequest>): MemoRequest {
+  return {
+    ...memo,
+    ...updates,
+    estimatedTotal: updates.items ? calculateTotal(updates.items) : memo.estimatedTotal,
+    updatedAt: new Date().toISOString(),
   };
 }
 
@@ -179,14 +193,14 @@ export const useProcurementStore = create<ProcurementState>()(
       saveDraft: (memoId, updates) => {
         set((state) => ({
           memos: state.memos.map((memo) =>
-            memo.id === memoId
-              ? {
-                  ...memo,
-                  ...updates,
-                  estimatedTotal: updates.items ? calculateTotal(updates.items) : memo.estimatedTotal,
-                  updatedAt: new Date().toISOString(),
-                }
-              : memo,
+            memo.id === memoId ? updateMemoFields(memo, updates) : memo,
+          ),
+        }));
+      },
+      updateMemo: (memoId, updates) => {
+        set((state) => ({
+          memos: state.memos.map((memo) =>
+            memo.id === memoId ? updateMemoFields(memo, updates) : memo,
           ),
         }));
       },
@@ -212,6 +226,33 @@ export const useProcurementStore = create<ProcurementState>()(
                   currentUser?.role ?? "Requester",
                   "Submitted",
                   "ส่งคำขอเพื่อขออนุมัติ",
+                ),
+              ],
+            };
+          }),
+        }));
+      },
+      resubmitMemo: (memoId, updates) => {
+        set((state) => ({
+          memos: state.memos.map((memo) => {
+            if (memo.id !== memoId) return memo;
+
+            const currentUser = state.users.find((user) => user.id === state.currentUserId);
+
+            return {
+              ...updateMemoFields(memo, updates),
+              status: "Pending Approval",
+              history: [
+                ...memo.history,
+                createHistoryEntry(
+                  memo.id,
+                  memo.documentNumber,
+                  "Memo",
+                  state.currentUserId,
+                  currentUser?.name ?? "",
+                  currentUser?.role ?? "Requester",
+                  "Resubmitted",
+                  "แก้ไขและส่งคำขออีกครั้ง",
                 ),
               ],
             };
@@ -372,6 +413,7 @@ export const useProcurementStore = create<ProcurementState>()(
             const nextProposal: VendorProposal = {
               ...proposal,
               id: `proposal-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+              submittedToApprover: proposal.submittedToApprover ?? false,
               proposedById: currentUser.id,
               proposedByName: currentUser.name,
               createdAt: new Date().toISOString(),
@@ -402,11 +444,45 @@ export const useProcurementStore = create<ProcurementState>()(
           }),
         });
       },
-      submitVendorProposals: (poId) => {
+      updateVendorProposal: (poId, proposalId, updates) => {
+        set((state) => ({
+          purchaseOrders: state.purchaseOrders.map((po) =>
+            po.id === poId
+              ? {
+                  ...po,
+                  vendorProposals: po.vendorProposals.map((proposal) =>
+                    proposal.id === proposalId
+                      ? {
+                          ...proposal,
+                          ...updates,
+                          submittedToApprover: updates.submittedToApprover ?? proposal.submittedToApprover,
+                        }
+                      : proposal,
+                  ),
+                  updatedAt: new Date().toISOString(),
+                }
+              : po,
+          ),
+        }));
+      },
+      deleteVendorProposal: (poId, proposalId) => {
+        set((state) => ({
+          purchaseOrders: state.purchaseOrders.map((po) =>
+            po.id === poId
+              ? {
+                  ...po,
+                  vendorProposals: po.vendorProposals.filter((proposal) => proposal.id !== proposalId),
+                  updatedAt: new Date().toISOString(),
+                }
+              : po,
+          ),
+        }));
+      },
+      submitVendorProposals: (poId, proposalIds) => {
         const state = get();
         const currentUser = state.users.find((user) => user.id === state.currentUserId);
 
-        if (!currentUser) return;
+        if (!currentUser || proposalIds.length === 0) return;
 
         set({
           purchaseOrders: state.purchaseOrders.map((po) => {
@@ -414,6 +490,10 @@ export const useProcurementStore = create<ProcurementState>()(
 
             return {
               ...po,
+              vendorProposals: po.vendorProposals.map((proposal) => ({
+                ...proposal,
+                submittedToApprover: proposalIds.includes(proposal.id),
+              })),
               procurementStatus: "Pending Vendor Approval",
               history: [
                 ...po.history,
@@ -425,7 +505,7 @@ export const useProcurementStore = create<ProcurementState>()(
                   currentUser.name,
                   currentUser.role,
                   "Submitted for Vendor Approval",
-                  "ส่ง vendor options ให้ approver ตัดสินใจ",
+                  `ส่ง vendor options ${proposalIds.length} รายการให้ approver ตัดสินใจ`,
                 ),
               ],
               updatedAt: new Date().toISOString(),
@@ -507,6 +587,7 @@ export const useProcurementStore = create<ProcurementState>()(
           notes: vendor.badge,
           attachmentName: undefined,
           attachmentUrl: undefined,
+          submittedToApprover: true,
         });
 
         const po = get().purchaseOrders.find((item) => item.id === poId);
@@ -516,7 +597,10 @@ export const useProcurementStore = create<ProcurementState>()(
         }
       },
       sendPOForApproval: (poId) => {
-        get().submitVendorProposals(poId);
+        const proposalIds = get()
+          .purchaseOrders.find((item) => item.id === poId)
+          ?.vendorProposals.map((proposal) => proposal.id) ?? [];
+        get().submitVendorProposals(poId, proposalIds);
       },
       approvePO: () => undefined,
       rejectPO: () => undefined,
