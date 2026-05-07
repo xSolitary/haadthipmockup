@@ -4,8 +4,6 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   Home,
-  FileText,
-  CheckSquare,
   ShoppingBag,
   Truck,
   CreditCard,
@@ -16,9 +14,7 @@ import {
 
 const navItems = [
   { label: "Dashboard", href: "/", icon: Home },
-  { label: "Memo Request", href: "/memo/create", icon: FileText },
-  { label: "My Requests", href: "/my-requests", icon: Layers },
-  { label: "Approval Center", href: "/approvals", icon: CheckSquare },
+  { label: "Procure-to-Pay", href: "/my-requests", icon: Layers },
   { label: "Vendor Selection", href: "/pr-po", icon: ShoppingBag },
   { label: "Receiving & QC", href: "/receiving", icon: Truck },
   { label: "Payment", href: "/payment", icon: CreditCard },

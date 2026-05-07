@@ -1,355 +1,343 @@
 "use client";
 
-import {
-  Bar,
-  BarChart,
-  CartesianGrid,
-  Cell,
-  Pie,
-  PieChart,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from "recharts";
-import type { ReactNode } from "react";
-import { CheckCircle2, Database, PackageCheck, Search, ShieldCheck } from "lucide-react";
+import Link from "next/link";
+import type { ComponentType, ReactNode } from "react";
+import { useMemo, useState, useSyncExternalStore } from "react";
+import { ArrowRight, CalendarRange, FilePlus2, PackageSearch, Shapes, TimerReset, TrendingUp } from "lucide-react";
+import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
+import { useProcurementStore } from "@/store/useProcurementStore";
 
-const chartColors = ["#007946", "#4f86d9", "#f6c343", "#67b7dc", "#d9824b", "#7ca7df"];
-
-const filterChips = ["ทั้งหมด", "วัตถุดิบ", "บรรจุภัณฑ์", "อะไหล่", "งานบริการ", "Emergency"];
-
-const kpis = [
-  { label: "Spend", value: "฿182.06M" },
-  { label: "Suppliers", value: "2,792" },
-  { label: "Transactions", value: "18,960" },
-  { label: "PO Count", value: "6,209" },
-  { label: "PR Count", value: "6,811" },
-  { label: "Invoice Count", value: "10,387" },
-];
-
-const level1Spend = [
-  { name: "Production Parts", value: 85.54 },
-  { name: "Facilities", value: 37.91 },
-  { name: "IT & Telecoms", value: 23.89 },
-  { name: "Marketing", value: 17.69 },
-  { name: "Human Resources", value: 11.63 },
-  { name: "Travel", value: 5.4 },
-];
-
-const level3Spend = [
-  { name: "Gas System Components", spend: 16810785, transactions: 1685, suppliers: 8 },
-  { name: "Control Boards", spend: 16033564, transactions: 134, suppliers: 1 },
-  { name: "Printed Publications", spend: 14361685, transactions: 579, suppliers: 151 },
-  { name: "Knobs, Bezels & Endcaps", spend: 9913795, transactions: 1463, suppliers: 3 },
-  { name: "Harness", spend: 8307556, transactions: 2477, suppliers: 3 },
-  { name: "Educational Supplies", spend: 7198050, transactions: 163, suppliers: 32 },
-  { name: "Stationery", spend: 6522287, transactions: 777, suppliers: 215 },
-];
-
-const level2Spend = [
-  { name: "Mechanical", spend: 47833116 },
-  { name: "Electrical & Elec.", spend: 26694031 },
-  { name: "Office Equipm.", spend: 14678201 },
-  { name: "Publications", spend: 14361685 },
-  { name: "Employee Ben.", spend: 11573935 },
-];
-
-const level4Spend = [
-  { name: "Paper", spend: 2575976 },
-  { name: "HVAC Installat.", spend: 2330088 },
-  { name: "Security Servi.", spend: 1744412 },
-  { name: "Security Equip.", spend: 1382026 },
-  { name: "Pallets and Cr.", spend: 1372436 },
-];
-
-const suppliers = [
-  { name: "ELAN INDUSTRIAL", spend: 19.1 },
-  { name: "ECI-ELECTRIC", spend: 8.88 },
-  { name: "ROBERTSHAW", spend: 7.2 },
-];
-
-const categoryTree = ["Appliances", "Facilities", "Human Resources", "IT & Telecoms", "Logistics"];
-
-const bracketColors = ["#4f86d9", "#405c92", "#f6c343", "#d95757", "#33a474", "#8bc4e6", "#df9356", "#9a6ca6"];
-const spendBracket = [
-  { label: "$0 - $1k", value: 3 },
-  { label: "$1k - $2k", value: 10 },
-  { label: "$2k - $5k", value: 12 },
-  { label: "$5k - $10k", value: 17 },
-  { label: "$10k - $25k", value: 16 },
-  { label: "$25k - $50k", value: 17 },
-  { label: "$50k - $100k", value: 18 },
-  { label: "$100k+", value: 7 },
-];
-const transactionBracket = [
-  { label: "$0 - $1k", value: 16 },
-  { label: "$1k - $2k", value: 19 },
-  { label: "$2k - $5k", value: 31 },
-  { label: "$5k - $10k", value: 16 },
-  { label: "$10k - $25k", value: 10 },
-  { label: "$25k - $50k", value: 4 },
-  { label: "$50k - $100k", value: 2 },
-  { label: "$100k+", value: 2 },
-];
-
-const workflowSteps = ["Memo", "Approval", "PR", "Vendor Selection", "PO", "Receiving/QC", "Payment"];
+const chartColors = ["#007946", "#0f766e", "#2563eb", "#f59e0b", "#dc2626", "#7c3aed", "#ea580c", "#0891b2"];
+const cardClassName = "rounded-3xl border border-slate-200 bg-white shadow-sm shadow-slate-100";
 
 const formatCurrency = (value: number) =>
-  new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-    maximumFractionDigits: 0,
-  }).format(value);
+  new Intl.NumberFormat("th-TH", { style: "currency", currency: "THB", maximumFractionDigits: 0 }).format(value);
 
-const formatBaht = (value: number) =>
-  new Intl.NumberFormat("th-TH", {
-    style: "currency",
-    currency: "THB",
-    maximumFractionDigits: 0,
-  }).format(value);
+const toDateOnly = (value: string) => value.slice(0, 10);
 
-function Panel({
-  title,
-  children,
-  className = "",
-}: {
-  title: string;
-  children: ReactNode;
-  className?: string;
-}) {
+function DashboardKpiCard({ label, value }: { label: string; value: string }) {
   return (
-    <section className={`flex min-h-[240px] flex-col rounded-lg border border-slate-200 bg-white p-3 shadow-sm ${className}`}>
-      <h2 className="mb-2 text-sm font-semibold text-[#c65353]">{title}</h2>
-      {children}
-    </section>
-  );
-}
-
-function SegmentationBar({ data }: { data: typeof spendBracket }) {
-  return (
-    <div className="flex h-11 w-full overflow-hidden rounded-sm border border-white bg-slate-100">
-      {data.map((item, index) => (
-        <div
-          key={item.label}
-          className="flex min-w-6 items-center justify-center text-[11px] font-semibold text-white"
-          style={{ width: `${item.value}%`, background: bracketColors[index % bracketColors.length] }}
-          title={`${item.label}: ${item.value}%`}
-        >
-          {item.value >= 3 ? `${item.value}%` : ""}
-        </div>
-      ))}
+    <div className={`${cardClassName} flex h-36 flex-col justify-between p-5`}>
+      <p className="text-sm font-medium tracking-normal text-slate-500">{label}</p>
+      <p className="text-[clamp(1.5rem,2vw,2rem)] font-bold leading-tight tracking-normal text-[#007946]">{value}</p>
     </div>
   );
 }
 
-export default function DashboardPage() {
+function ActionCard({
+  href,
+  title,
+  value,
+  icon: Icon,
+  muted = false,
+}: {
+  href?: string;
+  title: string;
+  value: string;
+  icon: ComponentType<{ className?: string }>;
+  muted?: boolean;
+}) {
+  const content: ReactNode = (
+    <>
+      <div className="flex items-start justify-between gap-4">
+        <div className={`rounded-2xl p-3 ${muted ? "bg-slate-100 text-slate-500" : "bg-[#f0f9f6] text-[#007946]"}`}>
+          <Icon className="h-5 w-5" />
+        </div>
+        {!muted ? <ArrowRight className="h-4 w-4 text-slate-400 transition group-hover:translate-x-1 group-hover:text-[#007946]" /> : null}
+      </div>
+      <div className="space-y-2">
+        <p className="text-base font-semibold tracking-normal text-slate-900">{title}</p>
+        <p className={`text-3xl font-bold leading-none tracking-normal ${muted ? "text-slate-500" : "text-[#007946]"}`}>{value}</p>
+      </div>
+    </>
+  );
+
+  const className = `${cardClassName} group flex h-48 flex-col justify-between p-5 transition ${
+    muted ? "cursor-default" : "hover:-translate-y-0.5 hover:border-[#007946]/20 hover:shadow-md"
+  }`;
+
+  if (!href) {
+    return <div className={className}>{content}</div>;
+  }
+
   return (
-    <div className="space-y-3 text-slate-800">
-      <div className="rounded-b-lg bg-[#2f285f] px-4 py-3 text-white shadow-sm">
-        <div className="flex flex-col gap-3 2xl:flex-row 2xl:items-center 2xl:justify-between">
-          <div>
-            <p className="text-xs text-white/70">หน้าหลัก</p>
-            <h1 className="text-2xl font-semibold">Category Console</h1>
+    <Link href={href} className={className}>
+      {content}
+    </Link>
+  );
+}
+
+export default function DashboardPage() {
+  const currentUserId = useProcurementStore((state) => state.currentUserId);
+  const memos = useProcurementStore((state) => state.memos);
+  const purchaseOrders = useProcurementStore((state) => state.purchaseOrders);
+  const paymentRequests = useProcurementStore((state) => state.paymentRequests);
+
+  const allDates = useMemo(
+    () =>
+      [
+        ...memos.map((memo) => toDateOnly(memo.requestDate || memo.createdAt)),
+        ...purchaseOrders.map((po) => toDateOnly(po.createdAt)),
+        ...paymentRequests.map((payment) => toDateOnly(payment.createdAt)),
+      ].sort(),
+    [memos, paymentRequests, purchaseOrders],
+  );
+
+  const minDate = allDates[0] ?? new Date().toISOString().slice(0, 10);
+  const maxDate = allDates[allDates.length - 1] ?? new Date().toISOString().slice(0, 10);
+
+  const [startDate, setStartDate] = useState(minDate);
+  const [endDate, setEndDate] = useState(maxDate);
+  const isChartReady = useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false,
+  );
+
+  const filteredMemos = useMemo(
+    () =>
+      memos.filter((memo) => {
+        const date = toDateOnly(memo.requestDate || memo.createdAt);
+        return date >= startDate && date <= endDate;
+      }),
+    [endDate, memos, startDate],
+  );
+
+  const filteredPurchaseOrders = useMemo(
+    () =>
+      purchaseOrders.filter((po) => {
+        const date = toDateOnly(po.createdAt);
+        return date >= startDate && date <= endDate;
+      }),
+    [endDate, purchaseOrders, startDate],
+  );
+
+  const filteredPayments = useMemo(
+    () =>
+      paymentRequests.filter((payment) => {
+        const date = toDateOnly(payment.createdAt);
+        return date >= startDate && date <= endDate;
+      }),
+    [endDate, paymentRequests, startDate],
+  );
+
+  const pieData = useMemo(() => {
+    const grouped = filteredMemos.reduce<Record<string, number>>((acc, memo) => {
+      acc[memo.category] = (acc[memo.category] ?? 0) + memo.estimatedTotal;
+      return acc;
+    }, {});
+
+    const total = Object.values(grouped).reduce((sum, value) => sum + value, 0);
+
+    return Object.entries(grouped)
+      .map(([name, value]) => ({
+        name,
+        value,
+        percent: total === 0 ? 0 : (value / total) * 100,
+      }))
+      .sort((a, b) => b.value - a.value);
+  }, [filteredMemos]);
+
+  const memoCount = filteredMemos.length;
+  const prCount = filteredPurchaseOrders.length;
+  const poCount = filteredPurchaseOrders.filter((po) => ["PO Created", "Sent to Vendor", "Pending Receiving", "Received", "QC Passed"].includes(po.procurementStatus)).length;
+  const transactionCount = memoCount + prCount + filteredPayments.length;
+  const budgetAmount = filteredMemos.reduce((sum, memo) => sum + memo.budgetRemaining, 0);
+  const spentAmount = filteredPurchaseOrders.reduce((sum, po) => sum + po.amount, 0);
+
+  const memoActionCount = memos.filter(
+    (memo) =>
+      memo.requesterId === currentUserId &&
+      (memo.status === "Draft" || memo.status === "Revision Required" || memo.status === "Pending Approval"),
+  ).length;
+  const approvalsLeft = memos.filter((memo) => memo.assignedApproverId === currentUserId && memo.status === "Pending Approval").length;
+  const vendorSelectionsLeft = purchaseOrders.filter((po) => {
+    const sourceMemo = memos.find((memo) => memo.id === po.memoId);
+    return sourceMemo?.requesterId === currentUserId && ["Waiting for Purchasing to Propose Vendors", "Pending Vendor Approval"].includes(po.procurementStatus);
+  }).length;
+
+  const topCategory = pieData[0] ?? null;
+  const secondCategory = pieData[1] ?? null;
+  const topCategoryGap = topCategory && secondCategory ? topCategory.percent - secondCategory.percent : null;
+  const categoryInsight = !topCategory
+    ? "ยังไม่มีข้อมูลเพียงพอสำหรับสรุปแนวโน้มการใช้จ่าย"
+    : topCategory.percent >= 45
+      ? `การใช้จ่ายกระจุกอยู่ที่หมวด ${topCategory.name} ค่อนข้างมาก ควรติดตามงบและแผนจัดซื้ออย่างใกล้ชิด`
+      : `สัดส่วนการใช้จ่ายค่อนข้างกระจาย โดย ${topCategory.name} ยังเป็นหมวดหลักของช่วงเวลานี้`;
+  const suggestedAction = !topCategory
+    ? "ขยายช่วงวันที่หรือเพิ่มรายการ Memo เพื่อดูภาพรวมที่ชัดขึ้น"
+    : `ตรวจสอบรายการในหมวด ${topCategory.name} และวางแผนจัดซื้อรอบถัดไปล่วงหน้าเพื่อลดงานเร่งด่วน`;
+
+  return (
+    <div className="space-y-6 text-slate-900">
+      <section className={`${cardClassName} px-6 py-6`}>
+        <div className="flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
+          <div className="max-w-3xl">
+            <p className="text-sm font-medium tracking-normal text-[#007946]">Dashboard</p>
+            <h1 className="mt-3 text-3xl font-bold tracking-normal text-slate-900 md:text-4xl">ภาพรวมการจัดซื้อ</h1>
+            <p className="mt-2 text-sm leading-6 tracking-normal text-slate-500">
+              ติดตาม KPI งานค้าง และโครงสร้างการใช้จ่ายตามช่วงวันที่ที่เลือก โดยยังคงใช้ข้อมูลเดิมจากระบบทั้งหมด
+            </p>
           </div>
-          <div className="grid gap-2 lg:grid-cols-[1fr_auto]">
-            <div className="flex flex-wrap gap-2">
-              {filterChips.map((chip, index) => (
-                <button
-                  key={chip}
-                  type="button"
-                  className={`h-10 min-w-32 rounded-md px-4 text-sm font-medium shadow-sm transition ${
-                    index === 0 || chip === "Emergency"
-                      ? "bg-orange-500 text-white hover:bg-orange-600"
-                      : "bg-white/15 text-white hover:bg-white/25"
-                  }`}
-                >
-                  {chip}
-                </button>
-              ))}
+
+          <div className="grid gap-3 sm:grid-cols-[auto_1fr_1fr] sm:items-center">
+            <div className="inline-flex h-12 items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-4 text-sm font-medium tracking-normal text-slate-600">
+              <CalendarRange className="h-4 w-4 text-[#007946]" />
+              Date Range
             </div>
-            <div className="flex flex-wrap gap-2">
-              {["2019", "01/01/2019", "31/12/2019"].map((filter) => (
-                <button key={filter} type="button" className="h-10 min-w-24 rounded-md bg-white/15 px-4 text-sm text-white">
-                  {filter}
-                </button>
-              ))}
-            </div>
+            <input
+              type="date"
+              value={startDate}
+              max={endDate}
+              onChange={(event) => setStartDate(event.target.value)}
+              className="h-12 rounded-2xl border border-slate-200 bg-white px-4 text-sm font-medium tracking-normal text-slate-700 outline-none transition focus:border-[#007946] focus:ring-2 focus:ring-[#007946]/10"
+            />
+            <input
+              type="date"
+              value={endDate}
+              min={startDate}
+              onChange={(event) => setEndDate(event.target.value)}
+              className="h-12 rounded-2xl border border-slate-200 bg-white px-4 text-sm font-medium tracking-normal text-slate-700 outline-none transition focus:border-[#007946] focus:ring-2 focus:ring-[#007946]/10"
+            />
           </div>
         </div>
-      </div>
+      </section>
 
-      <div className="grid gap-3 md:grid-cols-3 xl:grid-cols-6">
-        {kpis.map((kpi) => (
-          <div key={kpi.label} className="flex h-20 flex-col items-center justify-center rounded-lg border border-slate-200 bg-white px-3 shadow-sm">
-            <p className="text-sm font-semibold text-[#c65353]">{kpi.label}</p>
-            <p className="mt-1 text-xl font-semibold text-[#007946]">{kpi.value}</p>
-          </div>
-        ))}
-      </div>
+      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-6">
+        <DashboardKpiCard label="Memo Count" value={memoCount.toString()} />
+        <DashboardKpiCard label="PR Count" value={prCount.toString()} />
+        <DashboardKpiCard label="PO Count" value={poCount.toString()} />
+        <DashboardKpiCard label="Transaction Count" value={transactionCount.toString()} />
+        <DashboardKpiCard label="Budget Amount" value={formatCurrency(budgetAmount)} />
+        <DashboardKpiCard label="Spent Amount" value={formatCurrency(spentAmount)} />
+      </section>
 
-      <div className="grid auto-rows-fr gap-3 xl:grid-cols-3">
-        <Panel title="Spend by Category Level 1">
-          <div className="grid min-h-0 flex-1 grid-cols-[130px_1fr] gap-2">
-            <div className="space-y-2 pt-2 text-xs text-slate-600">
-              {level1Spend.map((entry, index) => (
-                <div key={entry.name} className="flex items-center gap-2">
-                  <span className="h-3 w-3 rounded-full" style={{ background: chartColors[index] }} />
-                  <span className="truncate">{entry.name}</span>
+      <section className="grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
+        <div className="space-y-6">
+          <section className={`${cardClassName} p-6`}>
+            <div className="flex items-center justify-between gap-4 border-b border-slate-200 pb-4">
+              <div>
+                <p className="text-sm font-medium tracking-normal text-[#007946]">My Work Queue</p>
+                <h2 className="mt-1 text-2xl font-bold tracking-normal text-slate-900">Action Required from Me</h2>
+              </div>
+              <div className="hidden rounded-2xl bg-[#f0f9f6] p-3 text-[#007946] md:block">
+                <TrendingUp className="h-5 w-5" />
+              </div>
+            </div>
+
+            <div className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+              <ActionCard href="/my-requests" title="Create Memo" value={memoActionCount.toString()} icon={FilePlus2} />
+              <ActionCard href="/my-requests" title="Approvals Left" value={approvalsLeft.toString()} icon={TimerReset} />
+              <ActionCard href="/pr-po" title="Vendor Selection" value={vendorSelectionsLeft.toString()} icon={PackageSearch} />
+              <ActionCard title="SAP (Dummy)" value="0" icon={Shapes} muted />
+            </div>
+          </section>
+
+          <section className={`${cardClassName} p-6`}>
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <p className="text-sm font-medium tracking-normal text-[#007946]">System Status</p>
+                <h2 className="mt-1 text-xl font-bold tracking-normal text-slate-900">ERP / Inventory Status</h2>
+              </div>
+              <span className="inline-flex rounded-full bg-[#f0f9f6] px-3 py-1 text-xs font-medium tracking-normal text-[#007946]">Operational</span>
+            </div>
+
+            <div className="mt-5 grid gap-4 sm:grid-cols-2">
+              {[
+                { label: "ERP Sync", value: "Connected" },
+                { label: "Inventory", value: "Updated 5 mins ago" },
+                { label: "Vendor Master", value: "Ready" },
+                { label: "Budget Control", value: "Active" },
+              ].map((item) => (
+                <div key={item.label} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                  <p className="text-xs font-medium tracking-normal text-slate-500">{item.label}</p>
+                  <p className="mt-2 text-lg font-semibold tracking-normal text-slate-900">{item.value}</p>
                 </div>
               ))}
             </div>
-            <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={180} initialDimension={{ width: 360, height: 180 }}>
-              <PieChart>
-                <Pie data={level1Spend} dataKey="value" nameKey="name" outerRadius={78} strokeWidth={0}>
-                  {level1Spend.map((entry, index) => (
-                    <Cell key={entry.name} fill={chartColors[index % chartColors.length]} />
-                  ))}
-                </Pie>
-                <Tooltip formatter={(value) => `฿${Number(value).toFixed(2)}M`} />
-              </PieChart>
-            </ResponsiveContainer>
-          </div>
-        </Panel>
+          </section>
+        </div>
 
-        <Panel title="Spend by Category Level 3">
-          <div className="overflow-hidden rounded border border-slate-200 text-xs">
-            <div className="grid grid-cols-[1.5fr_1fr_0.8fr_0.7fr] bg-[#4f86d9] px-2 py-1.5 font-semibold text-white">
-              <span>Category Level 3</span>
-              <span>Spend</span>
-              <span>Transactions</span>
-              <span>Suppliers</span>
-            </div>
-            <div className="max-h-[190px] divide-y divide-slate-100 overflow-auto">
-              {level3Spend.map((row, index) => (
-                <div key={row.name} className="grid grid-cols-[1.5fr_1fr_0.8fr_0.7fr] items-center px-2 py-1 text-slate-600">
-                  <span className="truncate">{row.name}</span>
-                  <span>{formatBaht(row.spend)}</span>
-                  <span className="bg-blue-100 px-1 text-right">{row.transactions}</span>
-                  <span className={`${index % 2 === 0 ? "bg-red-100" : "bg-green-100"} px-1 text-right`}>{row.suppliers}</span>
-                </div>
-              ))}
-            </div>
+        <section className={`${cardClassName} overflow-hidden p-6`}>
+          <div className="flex flex-col gap-2">
+            <p className="text-sm font-medium tracking-normal text-[#007946]">Spend Insight</p>
+            <h2 className="text-xl font-bold tracking-normal text-slate-900">Category Spend Mix</h2>
+            <p className="text-sm leading-6 tracking-normal text-slate-500">
+              กราฟสรุปสัดส่วนการใช้จ่ายตามหมวดจัดซื้อในช่วงวันที่ที่เลือก พร้อมคำอธิบายสั้น ๆ เพื่อช่วยมองเห็นความเสี่ยงและแนวทางถัดไป
+            </p>
           </div>
-        </Panel>
 
-        <Panel title="Category Search">
-          <div className="mb-2 flex h-10 items-center gap-2 rounded border border-slate-200 bg-slate-50 px-3">
-            <Search className="h-4 w-4 text-slate-400" />
-            <input className="w-full bg-transparent text-sm outline-none placeholder:text-slate-400" placeholder="Search" />
-          </div>
-          <div className="space-y-2 overflow-auto text-sm text-slate-600">
-            {categoryTree.map((item) => (
-              <div key={item} className="flex h-7 items-center gap-2">
-                <span className="text-lg leading-none text-slate-500">+</span>
-                <span className="h-4 w-4 border border-sky-600 bg-white" />
-                <span>{item}</span>
-              </div>
-            ))}
-          </div>
-        </Panel>
-
-        <Panel title="Spend by Category Level 2">
-          <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={180} initialDimension={{ width: 480, height: 180 }}>
-            <BarChart data={level2Spend} layout="vertical" margin={{ top: 4, right: 34, bottom: 12, left: 86 }}>
-              <CartesianGrid stroke="#eef2f7" horizontal={false} />
-              <XAxis type="number" tickFormatter={(value) => `$${Number(value) / 1000000}M`} tickLine={false} axisLine={false} />
-              <YAxis type="category" dataKey="name" tickLine={false} axisLine={false} width={86} />
-              <Tooltip formatter={(value) => formatCurrency(Number(value))} />
-              <Bar dataKey="spend" fill="#4f86d9" barSize={20} />
-            </BarChart>
-          </ResponsiveContainer>
-        </Panel>
-
-        <Panel title="Spend by Category Level 4">
-          <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={180} initialDimension={{ width: 480, height: 180 }}>
-            <BarChart data={level4Spend} layout="vertical" margin={{ top: 4, right: 34, bottom: 12, left: 86 }}>
-              <CartesianGrid stroke="#eef2f7" horizontal={false} />
-              <XAxis type="number" tickFormatter={(value) => `$${Number(value) / 1000000}M`} tickLine={false} axisLine={false} />
-              <YAxis type="category" dataKey="name" tickLine={false} axisLine={false} width={86} />
-              <Tooltip formatter={(value) => formatCurrency(Number(value))} />
-              <Bar dataKey="spend" fill="#4f86d9" barSize={20} />
-            </BarChart>
-          </ResponsiveContainer>
-        </Panel>
-
-        <Panel title="Supplier Search">
-          <div className="mb-4 flex h-10 items-center gap-2 rounded border border-slate-300 bg-white px-3">
-            <input className="w-full bg-transparent text-sm outline-none placeholder:text-slate-400" placeholder="Search" />
-            <Search className="h-4 w-4 text-slate-400" />
-          </div>
-          <div className="space-y-3">
-            {suppliers.map((supplier) => (
-              <div key={supplier.name} className="grid grid-cols-[110px_1fr_52px] items-center gap-2 text-xs text-slate-600">
-                <span className="truncate">{supplier.name}</span>
-                <div className="h-5 rounded-sm bg-[#4f86d9]" style={{ width: `${Math.max(28, supplier.spend * 4)}%` }} />
-                <span className="font-semibold text-[#4f86d9]">${supplier.spend.toFixed(2)}M</span>
-              </div>
-            ))}
-          </div>
-        </Panel>
-      </div>
-
-      <div className="grid gap-3 xl:grid-cols-2">
-        <Panel title="Spend Segmentation by Value Bracket" className="min-h-[140px]">
-          <div className="mb-3 flex flex-wrap gap-3 text-xs text-slate-500">
-            {spendBracket.slice(0, 6).map((item, index) => (
-              <span key={item.label} className="flex items-center gap-1">
-                <span className="h-3 w-3 rounded-full" style={{ background: bracketColors[index] }} />
-                {item.label}
-              </span>
-            ))}
-          </div>
-          <SegmentationBar data={spendBracket} />
-        </Panel>
-        <Panel title="Transactions Segmentation by Value Bracket" className="min-h-[140px]">
-          <div className="mb-3 flex flex-wrap gap-3 text-xs text-slate-500">
-            {transactionBracket.slice(0, 6).map((item, index) => (
-              <span key={item.label} className="flex items-center gap-1">
-                <span className="h-3 w-3 rounded-full" style={{ background: bracketColors[index] }} />
-                {item.label}
-              </span>
-            ))}
-          </div>
-          <SegmentationBar data={transactionBracket} />
-        </Panel>
-      </div>
-
-      <div className="grid gap-3 xl:grid-cols-[1.4fr_0.8fr]">
-        <Panel title="Procurement Workflow" className="min-h-[120px]">
-          <div className="flex flex-wrap items-center gap-2">
-            {workflowSteps.map((step, index) => (
-              <div key={step} className="flex items-center gap-2">
-                <div className="flex h-10 min-w-28 items-center justify-center rounded-md border border-[#007946]/20 bg-[#f0f9f6] px-3 text-xs font-semibold text-[#007946]">
-                  {step}
-                </div>
-                {index !== workflowSteps.length - 1 ? <span className="text-slate-300">→</span> : null}
-              </div>
-            ))}
-          </div>
-        </Panel>
-        <Panel title="ERP / Inventory Status" className="min-h-[120px]">
-          <div className="grid gap-2 sm:grid-cols-2">
-            {[
-              { label: "ERP Sync", value: "Connected", icon: Database },
-              { label: "Inventory", value: "Updated 5 mins ago", icon: PackageCheck },
-              { label: "Vendor Master", value: "Ready", icon: ShieldCheck },
-              { label: "Budget Control", value: "Active", icon: CheckCircle2 },
-            ].map((item) => {
-              const Icon = item.icon;
-              return (
-                <div key={item.label} className="flex h-12 items-center gap-3 rounded-md bg-slate-50 px-3 text-sm">
-                  <Icon className="h-4 w-4 text-[#007946]" />
-                  <div>
-                    <p className="text-xs text-slate-500">{item.label}</p>
-                    <p className="font-semibold text-slate-800">{item.value}</p>
+          <div className="mt-6 rounded-[28px] border border-slate-200 bg-slate-50 p-5">
+            <div className="h-[320px]">
+              {isChartReady ? (
+                pieData.length > 0 ? (
+                  <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={280}>
+                    <PieChart>
+                      <Pie data={pieData} dataKey="value" nameKey="name" innerRadius={68} outerRadius={116} paddingAngle={3}>
+                        {pieData.map((entry, index) => (
+                          <Cell key={entry.name} fill={chartColors[index % chartColors.length]} />
+                        ))}
+                      </Pie>
+                      <Tooltip formatter={(value) => formatCurrency(Number(value))} />
+                    </PieChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="flex h-full items-center justify-center rounded-3xl border border-dashed border-slate-300 bg-white text-sm tracking-normal text-slate-400">
+                    ยังไม่มีข้อมูลในช่วงวันที่ที่เลือก
                   </div>
+                )
+              ) : (
+                <div className="flex h-full items-center justify-center rounded-3xl border border-dashed border-slate-300 bg-white text-sm tracking-normal text-slate-400">
+                  Preparing chart...
                 </div>
-              );
-            })}
+              )}
+            </div>
+
+            <div className="mt-5 space-y-3">
+              <h3 className="text-sm font-semibold tracking-normal text-slate-900">Graph Explanation</h3>
+              <div className="grid gap-3">
+                <div className="rounded-2xl bg-white p-4">
+                  <p className="text-xs font-medium tracking-normal text-slate-500">หมวดใช้จ่ายสูงสุด</p>
+                  <p className="mt-2 text-sm font-semibold tracking-normal text-slate-900">
+                    {topCategory
+                      ? `${topCategory.name} คิดเป็น ${topCategory.percent.toFixed(1)}% ของยอดใช้จ่ายรวม (${formatCurrency(topCategory.value)})`
+                      : "ยังไม่มีข้อมูลในช่วงวันที่ที่เลือก"}
+                  </p>
+                </div>
+                <div className="rounded-2xl bg-white p-4">
+                  <p className="text-xs font-medium tracking-normal text-slate-500">ความเสี่ยง / Insight</p>
+                  <p className="mt-2 text-sm leading-6 tracking-normal text-slate-700">
+                    {topCategory && topCategoryGap !== null && topCategoryGap > 15
+                      ? `${categoryInsight} โดยทิ้งห่างหมวดรองลงมา ${topCategoryGap.toFixed(1)} จุด`
+                      : categoryInsight}
+                  </p>
+                </div>
+                <div className="rounded-2xl bg-white p-4">
+                  <p className="text-xs font-medium tracking-normal text-slate-500">Suggested Action</p>
+                  <p className="mt-2 text-sm leading-6 tracking-normal text-slate-700">{suggestedAction}</p>
+                </div>
+              </div>
+            </div>
+
+            {pieData.length > 0 ? (
+              <div className="mt-5 grid gap-3 md:grid-cols-2">
+                {pieData.slice(0, 4).map((item, index) => (
+                  <div key={item.name} className="flex items-center justify-between gap-3 rounded-2xl bg-white px-4 py-3">
+                    <div className="flex items-center gap-3">
+                      <span className="h-3.5 w-3.5 rounded-full" style={{ backgroundColor: chartColors[index % chartColors.length] }} />
+                      <div>
+                        <p className="text-sm font-semibold tracking-normal text-slate-900">{item.name}</p>
+                        <p className="text-xs tracking-normal text-slate-500">{formatCurrency(item.value)}</p>
+                      </div>
+                    </div>
+                    <p className="text-sm font-semibold tracking-normal text-[#007946]">{item.percent.toFixed(1)}%</p>
+                  </div>
+                ))}
+              </div>
+            ) : null}
           </div>
-        </Panel>
-      </div>
+        </section>
+      </section>
     </div>
   );
 }

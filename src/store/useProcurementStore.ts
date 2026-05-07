@@ -1,30 +1,18 @@
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 import type { StateStorage } from "zustand/middleware";
-import {
-  initialStoreState,
-  users,
-  vendors,
-} from "@/lib/mock-data";
+import { defaultRole, defaultUserId, initialStoreState, users, vendors } from "@/lib/mock-data";
 import type {
   ApprovalHistory,
   MemoItem,
   MemoRequest,
   PaymentRequest,
-  Role,
-  ReceivingRecord,
   ProcurementState,
-  POApprovalRequest,
+  PurchaseOrder,
+  ReceivingRecord,
+  Role,
+  VendorProposal,
 } from "@/lib/types";
-
-const getUserForRole = (role: Role) =>
-  users.find((user) => user.role === role) ?? users[0];
-
-const formatDocumentNumber = (prefix: string, index: number) =>
-  `${prefix}-2026-${String(index).padStart(6, "0")}`;
-
-const calculateTotal = (items: MemoItem[]) =>
-  items.reduce((sum, item) => sum + item.quantity * item.unitPrice, 0);
 
 const noopStorage: StateStorage = {
   getItem: () => null,
@@ -32,17 +20,31 @@ const noopStorage: StateStorage = {
   removeItem: () => undefined,
 };
 
+const allowedLoginRoles: Array<Extract<Role, "Requester" | "Approver" | "Purchasing">> = [
+  "Requester",
+  "Approver",
+  "Purchasing",
+];
+
+const getUserForRole = (role: Role) => users.find((user) => user.role === role) ?? users[0];
+
+const formatDocumentNumber = (prefix: string, index: number) =>
+  `${prefix}-2026-${String(index).padStart(6, "0")}`;
+
+const calculateTotal = (items: MemoItem[]) =>
+  items.reduce((sum, item) => sum + item.quantity * item.unitPrice, 0);
+
 const createHistoryEntry = (
   documentId: string,
   documentNumber: string,
-  documentType: "Memo" | "PO",
+  documentType: "Memo" | "PR" | "PO",
   actorId: string,
   actorName: string,
   role: Role,
   action: ApprovalHistory["action"],
   comment: string,
 ): ApprovalHistory => ({
-  id: `hist-${Date.now()}`,
+  id: `hist-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
   documentId,
   documentNumber,
   documentType,
@@ -52,33 +54,105 @@ const createHistoryEntry = (
   action,
   comment,
   date: new Date().toISOString(),
-  actionLabelTh: 
-    action === "Approved" ? "อนุมัติ" :
-    action === "Rejected" ? "ไม่อนุมัติ" :
-    action === "Revision Required" ? "ขอแก้ไข" :
-    action === "Submitted" ? "ส่งขออนุมัติ" :
-    "บันทึกร่าง",
+  actionLabelTh:
+    action === "Approved"
+      ? "อนุมัติ"
+      : action === "Rejected"
+        ? "ไม่อนุมัติ"
+        : action === "Revision Required"
+          ? "ขอแก้ไข"
+          : action === "Submitted"
+            ? "ส่งขออนุมัติ"
+            : action === "Vendor Proposed"
+              ? "เสนอ vendor"
+              : action === "Submitted for Vendor Approval"
+                ? "ส่งอนุมัติ vendor"
+                : action === "Vendor Confirmed"
+                  ? "ยืนยัน vendor"
+                  : "บันทึกร่าง",
 });
+
+function normalizePurchaseOrder(po: PurchaseOrder, receiving?: ReceivingRecord): PurchaseOrder {
+  let procurementStatus = po.procurementStatus;
+
+  if (procurementStatus === "PR Created") {
+    procurementStatus = "Waiting for Purchasing to Propose Vendors";
+  } else if (procurementStatus === "Vendor Selected" || procurementStatus === "Pending PO Approval") {
+    procurementStatus = "Pending Vendor Approval";
+  } else if (procurementStatus === "PO Approved") {
+    procurementStatus = "PO Created";
+  } else if (procurementStatus === "Receiving" || procurementStatus === "QC Pending") {
+    procurementStatus = receiving?.qcStatus === "QC Passed" ? "QC Passed" : "Received";
+  }
+
+  if (receiving?.qcStatus === "QC Passed") {
+    procurementStatus = "QC Passed";
+  } else if (receiving && procurementStatus !== "QC Passed") {
+    procurementStatus = "Received";
+  }
+
+  return {
+    ...po,
+    vendorProposals: po.vendorProposals ?? [],
+    history: po.history ?? [],
+    selectedVendorName: po.selectedVendorName ?? po.vendorName,
+    procurementStatus,
+  };
+}
+
+function normalizeState(state: ProcurementState): ProcurementState {
+  const receivingByPoId = new Map(state.receivingRecords.map((record) => [record.poId, record]));
+  const purchaseOrders = state.purchaseOrders.map((po) => normalizePurchaseOrder(po, receivingByPoId.get(po.id)));
+
+  return {
+    ...state,
+    currentRole: state.currentRole ?? defaultRole,
+    currentUserId: state.currentUserId ?? defaultUserId,
+    isAuthenticated: Boolean(state.isAuthenticated),
+    purchaseOrders,
+    approvalHistory: state.approvalHistory ?? [],
+    poApprovalRequests: state.poApprovalRequests ?? [],
+  };
+}
 
 export const useProcurementStore = create<ProcurementState>()(
   persist(
     (set, get) => ({
-      ...initialStoreState,
+      ...normalizeState(initialStoreState as unknown as ProcurementState),
+      loginAsRole: (role) => {
+        const user = getUserForRole(role);
+        set({
+          currentRole: role,
+          currentUserId: user.id,
+          isAuthenticated: true,
+        });
+      },
+      logout: () => {
+        set({
+          currentRole: defaultRole,
+          currentUserId: defaultUserId,
+          isAuthenticated: false,
+        });
+      },
       switchRole: (role) => {
         const user = getUserForRole(role);
-        set({ currentRole: role, currentUserId: user.id });
+        set({
+          currentRole: role,
+          currentUserId: user.id,
+          isAuthenticated: allowedLoginRoles.includes(role as Extract<Role, "Requester" | "Approver" | "Purchasing">),
+        });
       },
       createMemo: (memo) => {
         const state = get();
         const nextId = `memo-${state.memos.length + 1}`;
+        const documentNumber = formatDocumentNumber("MEMO", state.memos.length + 1);
+        const currentUser = state.users.find((user) => user.id === state.currentUserId);
         const newMemo: MemoRequest = {
           id: nextId,
-          documentNumber: formatDocumentNumber("MEMO", state.memos.length + 1),
+          documentNumber,
           ...memo,
           requesterId: state.currentUserId,
-          requesterName:
-            state.users.find((user) => user.id === state.currentUserId)
-              ?.name ?? "ทีมงาน",
+          requesterName: currentUser?.name ?? "ทีมงาน",
           assignedApproverId: "u2",
           currentApproverName: "นางสาวปัทมา วัฒนสุข",
           status: "Draft",
@@ -89,16 +163,17 @@ export const useProcurementStore = create<ProcurementState>()(
           history: [
             createHistoryEntry(
               nextId,
-              formatDocumentNumber("MEMO", state.memos.length + 1),
+              documentNumber,
               "Memo",
               state.currentUserId,
-              state.users.find((user) => user.id === state.currentUserId)?.name ?? "",
-              state.users.find((user) => user.id === state.currentUserId)?.role ?? "Requester",
+              currentUser?.name ?? "",
+              currentUser?.role ?? "Requester",
               "Draft Saved",
               "สร้างร่าง Memo",
             ),
           ],
         };
+
         set({ memos: [...state.memos, newMemo] });
       },
       saveDraft: (memoId, updates) => {
@@ -108,9 +183,7 @@ export const useProcurementStore = create<ProcurementState>()(
               ? {
                   ...memo,
                   ...updates,
-                  estimatedTotal: updates.items
-                    ? calculateTotal(updates.items)
-                    : memo.estimatedTotal,
+                  estimatedTotal: updates.items ? calculateTotal(updates.items) : memo.estimatedTotal,
                   updatedAt: new Date().toISOString(),
                 }
               : memo,
@@ -119,125 +192,146 @@ export const useProcurementStore = create<ProcurementState>()(
       },
       submitMemo: (memoId) => {
         set((state) => ({
-          memos: state.memos.map((memo) =>
-            memo.id === memoId
-              ? {
-                  ...memo,
-                  status: "Pending Approval",
-                  updatedAt: new Date().toISOString(),
-                  history: [
-                    ...memo.history,
-                    createHistoryEntry(
-                      memo.id,
-                      memo.documentNumber,
-                      "Memo",
-                      state.currentUserId,
-                      state.users.find((user) => user.id === state.currentUserId)?.name ?? "",
-                      state.users.find((user) => user.id === state.currentUserId)?.role ?? "Requester",
-                      "Submitted",
-                      "ส่งคำขอเพื่อขออนุมัติ",
-                    ),
-                  ],
-                }
-              : memo,
-          ),
+          memos: state.memos.map((memo) => {
+            if (memo.id !== memoId) return memo;
+
+            const currentUser = state.users.find((user) => user.id === state.currentUserId);
+
+            return {
+              ...memo,
+              status: "Pending Approval",
+              updatedAt: new Date().toISOString(),
+              history: [
+                ...memo.history,
+                createHistoryEntry(
+                  memo.id,
+                  memo.documentNumber,
+                  "Memo",
+                  state.currentUserId,
+                  currentUser?.name ?? "",
+                  currentUser?.role ?? "Requester",
+                  "Submitted",
+                  "ส่งคำขอเพื่อขออนุมัติ",
+                ),
+              ],
+            };
+          }),
         }));
       },
       approveMemo: (memoId, comment) => {
-        set((state) => ({
-          memos: state.memos.map((memo) =>
-            memo.id === memoId
+        const state = get();
+        const currentUser = state.users.find((user) => user.id === state.currentUserId);
+        const nextIndex = state.purchaseOrders.length + 1;
+        const prNumber = formatDocumentNumber("PR", nextIndex);
+        const poNumber = formatDocumentNumber("PO", nextIndex);
+        const memo = state.memos.find((item) => item.id === memoId);
+
+        if (!memo) return;
+
+        const purchaseOrder: PurchaseOrder = {
+          id: `po-${nextIndex}`,
+          documentNumber: prNumber,
+          memoId,
+          memoTitle: memo.title,
+          vendorId: null,
+          vendorName: "Awaiting vendor proposal",
+          procurementStatus: "Waiting for Purchasing to Propose Vendors",
+          amount: memo.estimatedTotal,
+          prNumber,
+          poNumber,
+          poApprovalRequired: false,
+          poApprovalStatus: undefined,
+          selectedVendorId: undefined,
+          selectedVendorName: undefined,
+          vendorProposals: [],
+          history: [],
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        };
+
+        set({
+          memos: state.memos.map((item) =>
+            item.id === memoId
               ? {
-                  ...memo,
+                  ...item,
                   status: "Approved",
-                  procurementStatus: "PR Created",
+                  procurementStatus: "Waiting for Purchasing to Propose Vendors",
+                  prNumber,
+                  poNumber,
                   updatedAt: new Date().toISOString(),
                   history: [
-                    ...memo.history,
+                    ...item.history,
                     createHistoryEntry(
-                      memo.id,
-                      memo.documentNumber,
+                      item.id,
+                      item.documentNumber,
                       "Memo",
                       state.currentUserId,
-                      state.users.find((user) => user.id === state.currentUserId)?.name ?? "",
-                      state.users.find((user) => user.id === state.currentUserId)?.role ?? "Approver",
+                      currentUser?.name ?? "",
+                      currentUser?.role ?? "Approver",
                       "Approved",
                       comment || "อนุมัติคำขอ",
                     ),
                   ],
                 }
-              : memo,
+              : item,
           ),
-          purchaseOrders: [
-            ...state.purchaseOrders,
-            {
-              id: `po-${state.purchaseOrders.length + 1}`,
-              documentNumber: formatDocumentNumber("PR", state.purchaseOrders.length + 1),
-              memoId,
-              memoTitle:
-                state.memos.find((memo) => memo.id === memoId)?.title ?? "",
-              vendorId: null,
-              vendorName: "รอเลือกผู้ขาย",
-              procurementStatus: "PR Created",
-              amount:
-                state.memos.find((memo) => memo.id === memoId)
-                  ?.estimatedTotal ?? 0,
-              createdAt: new Date().toISOString(),
-              updatedAt: new Date().toISOString(),
-            },
-          ],
-        }));
+          purchaseOrders: [...state.purchaseOrders, purchaseOrder],
+        });
       },
       rejectMemo: (memoId, comment) => {
         set((state) => ({
-          memos: state.memos.map((memo) =>
-            memo.id === memoId
-              ? {
-                  ...memo,
-                  status: "Rejected",
-                  updatedAt: new Date().toISOString(),
-                  history: [
-                    ...memo.history,
-                    createHistoryEntry(
-                      memo.id,
-                      memo.documentNumber,
-                      "Memo",
-                      state.currentUserId,
-                      state.users.find((user) => user.id === state.currentUserId)?.name ?? "",
-                      state.users.find((user) => user.id === state.currentUserId)?.role ?? "Approver",
-                      "Rejected",
-                      comment || "ไม่อนุมัติคำขอ",
-                    ),
-                  ],
-                }
-              : memo,
-          ),
+          memos: state.memos.map((memo) => {
+            if (memo.id !== memoId) return memo;
+
+            const currentUser = state.users.find((user) => user.id === state.currentUserId);
+
+            return {
+              ...memo,
+              status: "Rejected",
+              updatedAt: new Date().toISOString(),
+              history: [
+                ...memo.history,
+                createHistoryEntry(
+                  memo.id,
+                  memo.documentNumber,
+                  "Memo",
+                  state.currentUserId,
+                  currentUser?.name ?? "",
+                  currentUser?.role ?? "Approver",
+                  "Rejected",
+                  comment || "ไม่อนุมัติคำขอ",
+                ),
+              ],
+            };
+          }),
         }));
       },
       requestRevision: (memoId, comment) => {
         set((state) => ({
-          memos: state.memos.map((memo) =>
-            memo.id === memoId
-              ? {
-                  ...memo,
-                  status: "Revision Required",
-                  updatedAt: new Date().toISOString(),
-                  history: [
-                    ...memo.history,
-                    createHistoryEntry(
-                      memo.id,
-                      memo.documentNumber,
-                      "Memo",
-                      state.currentUserId,
-                      state.users.find((user) => user.id === state.currentUserId)?.name ?? "",
-                      state.users.find((user) => user.id === state.currentUserId)?.role ?? "Approver",
-                      "Revision Required",
-                      comment || "ขอแก้ไขข้อมูล",
-                    ),
-                  ],
-                }
-              : memo,
-          ),
+          memos: state.memos.map((memo) => {
+            if (memo.id !== memoId) return memo;
+
+            const currentUser = state.users.find((user) => user.id === state.currentUserId);
+
+            return {
+              ...memo,
+              status: "Revision Required",
+              updatedAt: new Date().toISOString(),
+              history: [
+                ...memo.history,
+                createHistoryEntry(
+                  memo.id,
+                  memo.documentNumber,
+                  "Memo",
+                  state.currentUserId,
+                  currentUser?.name ?? "",
+                  currentUser?.role ?? "Approver",
+                  "Revision Required",
+                  comment || "ขอแก้ไขข้อมูล",
+                ),
+              ],
+            };
+          }),
         }));
       },
       createPR: (memoId) => {
@@ -246,7 +340,7 @@ export const useProcurementStore = create<ProcurementState>()(
             po.memoId === memoId
               ? {
                   ...po,
-                  procurementStatus: "PR Created",
+                  procurementStatus: "Waiting for Purchasing to Propose Vendors",
                   updatedAt: new Date().toISOString(),
                 }
               : po,
@@ -255,197 +349,215 @@ export const useProcurementStore = create<ProcurementState>()(
             memo.id === memoId
               ? {
                   ...memo,
-                  procurementStatus: "PR Created",
+                  procurementStatus: "Waiting for Purchasing to Propose Vendors",
                   status: "Converted to PR",
+                  prNumber: memo.prNumber ?? formatDocumentNumber("PR", state.purchaseOrders.length + 1),
+                  poNumber: memo.poNumber ?? formatDocumentNumber("PO", state.purchaseOrders.length + 1),
                   updatedAt: new Date().toISOString(),
                 }
               : memo,
           ),
         }));
       },
+      addVendorProposal: (poId, proposal) => {
+        const state = get();
+        const currentUser = state.users.find((user) => user.id === state.currentUserId);
+
+        if (!currentUser) return;
+
+        set({
+          purchaseOrders: state.purchaseOrders.map((po) => {
+            if (po.id !== poId) return po;
+
+            const nextProposal: VendorProposal = {
+              ...proposal,
+              id: `proposal-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+              proposedById: currentUser.id,
+              proposedByName: currentUser.name,
+              createdAt: new Date().toISOString(),
+            };
+
+            return {
+              ...po,
+              vendorProposals: [...po.vendorProposals, nextProposal],
+              procurementStatus:
+                po.procurementStatus === "Waiting for Purchasing to Propose Vendors"
+                  ? "Waiting for Purchasing to Propose Vendors"
+                  : po.procurementStatus,
+              history: [
+                ...po.history,
+                createHistoryEntry(
+                  po.id,
+                  po.prNumber ?? po.documentNumber,
+                  "PR",
+                  currentUser.id,
+                  currentUser.name,
+                  currentUser.role,
+                  "Vendor Proposed",
+                  `เพิ่ม vendor option: ${proposal.vendorName}`,
+                ),
+              ],
+              updatedAt: new Date().toISOString(),
+            };
+          }),
+        });
+      },
+      submitVendorProposals: (poId) => {
+        const state = get();
+        const currentUser = state.users.find((user) => user.id === state.currentUserId);
+
+        if (!currentUser) return;
+
+        set({
+          purchaseOrders: state.purchaseOrders.map((po) => {
+            if (po.id !== poId || po.vendorProposals.length === 0) return po;
+
+            return {
+              ...po,
+              procurementStatus: "Pending Vendor Approval",
+              history: [
+                ...po.history,
+                createHistoryEntry(
+                  po.id,
+                  po.prNumber ?? po.documentNumber,
+                  "PR",
+                  currentUser.id,
+                  currentUser.name,
+                  currentUser.role,
+                  "Submitted for Vendor Approval",
+                  "ส่ง vendor options ให้ approver ตัดสินใจ",
+                ),
+              ],
+              updatedAt: new Date().toISOString(),
+            };
+          }),
+          memos: state.memos.map((memo) => {
+            const relatedPo = state.purchaseOrders.find((po) => po.id === poId);
+            return memo.id === relatedPo?.memoId
+              ? {
+                  ...memo,
+                  procurementStatus: "Pending Vendor Approval",
+                  updatedAt: new Date().toISOString(),
+                }
+              : memo;
+          }),
+        });
+      },
+      approveVendorSelection: (poId, proposalId, comment) => {
+        const state = get();
+        const currentUser = state.users.find((user) => user.id === state.currentUserId);
+        const targetPo = state.purchaseOrders.find((po) => po.id === poId);
+        const proposal = targetPo?.vendorProposals.find((item) => item.id === proposalId);
+
+        if (!currentUser || !targetPo || !proposal) return;
+
+        set({
+          purchaseOrders: state.purchaseOrders.map((po) =>
+            po.id === poId
+              ? {
+                  ...po,
+                  vendorId: proposal.vendorId ?? null,
+                  vendorName: proposal.vendorName,
+                  selectedVendorId: proposal.vendorId ?? proposal.id,
+                  selectedVendorName: proposal.vendorName,
+                  amount: proposal.quotedPrice || po.amount,
+                  procurementStatus: "PO Created",
+                  poApprovalRequired: false,
+                  poApprovalStatus: undefined,
+                  history: [
+                    ...po.history,
+                    createHistoryEntry(
+                      po.id,
+                      po.prNumber ?? po.documentNumber,
+                      "PR",
+                      currentUser.id,
+                      currentUser.name,
+                      currentUser.role,
+                      "Vendor Confirmed",
+                      comment || `ยืนยัน vendor ${proposal.vendorName}`,
+                    ),
+                  ],
+                  updatedAt: new Date().toISOString(),
+                }
+              : po,
+          ),
+          memos: state.memos.map((memo) =>
+            memo.id === targetPo.memoId
+              ? {
+                  ...memo,
+                  procurementStatus: "PO Created",
+                  selectedVendorId: proposal.vendorId ?? proposal.id,
+                  poNumber: memo.poNumber ?? targetPo.poNumber,
+                  updatedAt: new Date().toISOString(),
+                }
+              : memo,
+          ),
+        });
+      },
       selectVendor: (poId, vendorId) => {
         const vendor = vendors.find((item) => item.id === vendorId);
-        const state = get();
-        const po = state.purchaseOrders.find((item) => item.id === poId);
-        const amount = po?.amount ?? 0;
-        const requiresApproval = amount > 50000; // 50K THB threshold
-        
-        set((state) => ({
-          purchaseOrders: state.purchaseOrders.map((po) =>
-            po.id === poId
-              ? {
-                  ...po,
-                  vendorId,
-                  vendorName: vendor?.name ?? po.vendorName,
-                  selectedVendorId: vendorId,
-                  poApprovalRequired: requiresApproval,
-                  procurementStatus: "Vendor Selected",
-                  updatedAt: new Date().toISOString(),
-                }
-              : po,
-          ),
-        }));
-      },
-      createPO: (poId) => {
-        set((state) => ({
-          purchaseOrders: state.purchaseOrders.map((po) =>
-            po.id === poId
-              ? {
-                  ...po,
-                  procurementStatus: "PO Created",
-                  updatedAt: new Date().toISOString(),
-                }
-              : po,
-          ),
-        }));
+        if (!vendor) return;
+
+        get().addVendorProposal(poId, {
+          vendorId: vendor.id,
+          vendorName: vendor.name,
+          quotedPrice: vendor.price,
+          leadTime: vendor.leadTime,
+          paymentTerms: vendor.creditTerm,
+          notes: vendor.badge,
+          attachmentName: undefined,
+          attachmentUrl: undefined,
+        });
+
+        const po = get().purchaseOrders.find((item) => item.id === poId);
+        const proposalId = po?.vendorProposals[po.vendorProposals.length - 1]?.id;
+        if (proposalId) {
+          get().approveVendorSelection(poId, proposalId, `Auto-confirmed vendor ${vendor.name}`);
+        }
       },
       sendPOForApproval: (poId) => {
-        const state = get();
-        const po = state.purchaseOrders.find((item) => item.id === poId);
-        const memo = state.memos.find((item) => item.id === po?.memoId);
-        
-        if (!po || !memo) return;
-        
-        const poApprovalRequest: POApprovalRequest = {
-          id: `po-approval-${state.poApprovalRequests.length + 1}`,
-          documentNumber: po.documentNumber,
-          poId,
-          vendorName: po.vendorName,
-          amount: po.amount,
-          assignedApproverId: "u3",
-          assignedApproverName: "นายสมชาย ลิ่มธรรม",
-          status: "Pending",
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-          reason: memo.title,
-          history: [],
-        };
-        
-        set((state) => ({
-          poApprovalRequests: [...state.poApprovalRequests, poApprovalRequest],
-          purchaseOrders: state.purchaseOrders.map((po) =>
-            po.id === poId
-              ? {
-                  ...po,
-                  procurementStatus: "Pending PO Approval",
-                  poApprovalStatus: "Pending",
-                  updatedAt: new Date().toISOString(),
-                }
-              : po,
-          ),
-        }));
+        get().submitVendorProposals(poId);
       },
-      approvePO: (poApprovalId, comment) => {
-        const state = get();
-        const poApproval = state.poApprovalRequests.find((item) => item.id === poApprovalId);
-        
-        if (!poApproval) return;
-        
-        const currentUser = state.users.find((user) => user.id === state.currentUserId);
-        
-        set((state) => ({
-          poApprovalRequests: state.poApprovalRequests.map((item) =>
-            item.id === poApprovalId
-              ? {
-                  ...item,
-                  status: "Approved",
-                  poApprovalStatus: "Approved",
-                  updatedAt: new Date().toISOString(),
-                  history: [
-                    ...item.history,
-                    createHistoryEntry(
-                      item.poId,
-                      item.documentNumber,
-                      "PO",
-                      state.currentUserId,
-                      currentUser?.name ?? "User",
-                      currentUser?.role ?? "Approver",
-                      "Approved",
-                      comment || "อนุมัติ PO",
-                    ),
-                  ],
-                }
-              : item,
-          ),
-          purchaseOrders: state.purchaseOrders.map((po) =>
-            po.id === poApproval.poId
-              ? {
-                  ...po,
-                  procurementStatus: "PO Approved",
-                  poApprovalStatus: "Approved",
-                  updatedAt: new Date().toISOString(),
-                }
-              : po,
-          ),
-        }));
-      },
-      rejectPO: (poApprovalId, comment) => {
-        const state = get();
-        const poApproval = state.poApprovalRequests.find((item) => item.id === poApprovalId);
-        
-        if (!poApproval) return;
-        
-        const currentUser = state.users.find((user) => user.id === state.currentUserId);
-        
-        set((state) => ({
-          poApprovalRequests: state.poApprovalRequests.map((item) =>
-            item.id === poApprovalId
-              ? {
-                  ...item,
-                  status: "Rejected",
-                  poApprovalStatus: "Rejected",
-                  updatedAt: new Date().toISOString(),
-                  history: [
-                    ...item.history,
-                    createHistoryEntry(
-                      item.poId,
-                      item.documentNumber,
-                      "PO",
-                      state.currentUserId,
-                      currentUser?.name ?? "User",
-                      currentUser?.role ?? "Approver",
-                      "Rejected",
-                      comment || "ไม่อนุมัติ PO",
-                    ),
-                  ],
-                }
-              : item,
-          ),
-          purchaseOrders: state.purchaseOrders.map((po) =>
-            po.id === poApproval.poId
-              ? {
-                  ...po,
-                  procurementStatus: "PO Rejected",
-                  poApprovalStatus: "Rejected",
-                  updatedAt: new Date().toISOString(),
-                }
-              : po,
-          ),
-        }));
-      },
+      approvePO: () => undefined,
+      rejectPO: () => undefined,
       sendToVendor: (poId) => {
+        const po = get().purchaseOrders.find((item) => item.id === poId);
+        if (!po || po.procurementStatus !== "PO Created") return;
+
         set((state) => ({
-          purchaseOrders: state.purchaseOrders.map((po) =>
-            po.id === poId
+          purchaseOrders: state.purchaseOrders.map((item) =>
+            item.id === poId
               ? {
-                  ...po,
+                  ...item,
                   procurementStatus: "Sent to Vendor",
                   sentToVendorAt: new Date().toISOString(),
                   updatedAt: new Date().toISOString(),
                 }
-              : po,
+              : item,
+          ),
+          memos: state.memos.map((memo) =>
+            memo.id === po.memoId
+              ? {
+                  ...memo,
+                  procurementStatus: "Sent to Vendor",
+                  updatedAt: new Date().toISOString(),
+                }
+              : memo,
           ),
         }));
       },
       receivePo: (poId, record) => {
-        const po = get().purchaseOrders.find((item) => item.id === poId);
+        const state = get();
+        const po = state.purchaseOrders.find((item) => item.id === poId);
+
         if (!po) return;
-        const existing = get().receivingRecords.find((item) => item.poId === poId);
+
+        const existing = state.receivingRecords.find((item) => item.poId === poId);
         const newRecord: ReceivingRecord = {
-          id: existing?.id ?? `recv-${get().receivingRecords.length + 1}`,
+          id: existing?.id ?? `recv-${state.receivingRecords.length + 1}`,
           poId,
-          poNumber: po.documentNumber,
-          vendorName: po.vendorName,
+          poNumber: po.poNumber ?? po.documentNumber,
+          vendorName: po.selectedVendorName ?? po.vendorName,
           deliveryDate: record.deliveryDate ?? new Date().toISOString(),
           receivedQty: record.receivedQty ?? 0,
           condition: record.condition ?? "Good",
@@ -457,38 +569,52 @@ export const useProcurementStore = create<ProcurementState>()(
           qcStatus: record.qcStatus ?? "Pending QC",
           notes: record.notes ?? "รับสินค้าเพื่อรอตรวจสอบ",
         };
-        set((state) => ({
+
+        const nextStatus = newRecord.qcRequired ? "Received" : "QC Passed";
+
+        set({
           receivingRecords: state.receivingRecords.filter((item) => item.poId !== poId).concat(newRecord),
           purchaseOrders: state.purchaseOrders.map((item) =>
             item.id === poId
               ? {
                   ...item,
-                  procurementStatus: record.qcRequired ? "QC Pending" : "Receiving",
+                  procurementStatus: nextStatus,
                   updatedAt: new Date().toISOString(),
                 }
               : item,
           ),
-        }));
+          memos: state.memos.map((memo) =>
+            memo.id === po.memoId
+              ? {
+                  ...memo,
+                  procurementStatus: nextStatus,
+                  updatedAt: new Date().toISOString(),
+                }
+              : memo,
+          ),
+        });
       },
       markQcPassed: (poId) => {
         const state = get();
         const po = state.purchaseOrders.find((item) => item.id === poId);
-        if (!po) return;
         const existingPayment = state.paymentRequests.find((item) => item.poId === poId);
         const receiving = state.receivingRecords.find((item) => item.poId === poId);
-        const receivingAmount = receiving?.receivedQty ?? 0;
+
+        if (!po || !receiving) return;
+
         const paymentRequest: PaymentRequest =
           existingPayment ?? {
             id: `pay-${state.paymentRequests.length + 1}`,
             poId,
-            poNumber: po.documentNumber,
-            vendorName: po.vendorName,
+            poNumber: po.poNumber ?? po.documentNumber,
+            vendorName: po.selectedVendorName ?? po.vendorName,
             invoiceAmount: po.amount,
-            receivingAmount,
+            receivingAmount: receiving.receivedQty,
             status: "Ready for AP Posting",
             invoiceUploaded: true,
             createdAt: new Date().toISOString(),
           };
+
         set({
           receivingRecords: state.receivingRecords.map((item) =>
             item.poId === poId
@@ -506,6 +632,15 @@ export const useProcurementStore = create<ProcurementState>()(
                   updatedAt: new Date().toISOString(),
                 }
               : item,
+          ),
+          memos: state.memos.map((memo) =>
+            memo.id === po.memoId
+              ? {
+                  ...memo,
+                  procurementStatus: "QC Passed",
+                  updatedAt: new Date().toISOString(),
+                }
+              : memo,
           ),
           paymentRequests: existingPayment
             ? state.paymentRequests.map((item) =>
@@ -534,9 +669,11 @@ export const useProcurementStore = create<ProcurementState>()(
     }),
     {
       name: "ht-procurement-store",
+      version: 2,
       storage: createJSONStorage(() =>
         typeof window === "undefined" ? noopStorage : window.localStorage,
       ),
+      migrate: (persistedState) => normalizeState(persistedState as unknown as ProcurementState),
     },
   ),
 );

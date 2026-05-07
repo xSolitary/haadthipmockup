@@ -121,7 +121,7 @@ export default function CreateMemoPage() {
       requesterName: currentUser?.name ?? "ผู้ขอ",
     });
     submitMemo(nextMemoId);
-    router.push("/approvals");
+    router.push("/my-requests");
   };
 
   return (

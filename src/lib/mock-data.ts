@@ -7,6 +7,7 @@ import type {
   PurchaseOrder,
   ReceivingRecord,
   PaymentRequest,
+  VendorProposal,
 } from "@/lib/types";
 
 export const sites: SiteName[] = [
@@ -114,6 +115,10 @@ function totalFromItems(items: { quantity: number; unitPrice: number }[]) {
   return items.reduce((sum, item) => sum + item.quantity * item.unitPrice, 0);
 }
 
+function createProposal(proposal: VendorProposal): VendorProposal {
+  return proposal;
+}
+
 export const memoRequests: MemoRequest[] = [
   {
     id: "memo-1",
@@ -214,7 +219,9 @@ export const memoRequests: MemoRequest[] = [
     attachments: ["ใบเสนอราคาวัตถุดิบ.pdf"],
     budgetRemaining: 280000,
     status: "Approved",
-    procurementStatus: "PR Created",
+    procurementStatus: "Sent to Vendor",
+    prNumber: "PR-2026-000001",
+    poNumber: "PO-2026-000001",
     assignedApproverId: "u2",
     currentApproverName: "ฝ่ายจัดซื้อ",
     estimatedTotal: totalFromItems([
@@ -289,7 +296,11 @@ export const memoRequests: MemoRequest[] = [
     attachments: ["ใบเสนอราคาอะไหล่.pdf", "ใบคำขอ.xlsx"],
     budgetRemaining: 190000,
     status: "Approved",
-    procurementStatus: "Vendor Selected",
+    procurementStatus: "Pending Vendor Approval",
+    prNumber: "PR-2026-000002",
+    poNumber: "PO-2026-000002",
+    selectedVendorId: "v3",
+    poApprovalRequired: true,
     assignedApproverId: "u2",
     currentApproverName: "ฝ่ายจัดซื้อ",
     estimatedTotal: totalFromItems([
@@ -332,16 +343,140 @@ export const memoRequests: MemoRequest[] = [
 export const purchaseOrders: PurchaseOrder[] = [
   {
     id: "po-1",
-    documentNumber: "PO-2026-000001",
+    documentNumber: "PR-2026-000001",
     memoId: "memo-2",
     memoTitle: "สั่งซื้อ CO2 และน้ำตาล 1 ตัน",
     vendorId: "v1",
     vendorName: "บริษัท ไทยแพ็คซัพพลาย จำกัด",
     procurementStatus: "Sent to Vendor",
     amount: 12000 * 25 + 10 * 6200,
+    prNumber: "PR-2026-000001",
+    poNumber: "PO-2026-000001",
+    poApprovalRequired: true,
+    poApprovalStatus: "Approved",
+    selectedVendorId: "v1",
+    selectedVendorName: "บริษัท ไทยแพ็คซัพพลาย จำกัด",
+    vendorProposals: [
+      createProposal({
+        id: "proposal-1",
+        vendorId: "v1",
+        vendorName: "บริษัท ไทยแพ็คซัพพลาย จำกัด",
+        quotedPrice: 87000,
+        leadTime: "7 วัน",
+        paymentTerms: "30 วัน",
+        notes: "เสนอราคาปกติ",
+        attachmentName: "thai-pack-quote.pdf",
+        proposedById: "u3",
+        proposedByName: "นายวรพันธ์ นิ่มนวล",
+        createdAt: toISO(-7),
+      }),
+    ],
+    history: [
+      {
+        id: "hist-po-1-1",
+        documentId: "po-1",
+        documentNumber: "PR-2026-000001",
+        documentType: "PR",
+        actorId: "u3",
+        actorName: "นายวรพันธ์ นิ่มนวล",
+        role: "Purchasing",
+        action: "Vendor Proposed",
+        comment: "เสนอ vendor สำหรับ PR",
+        date: toISO(-7),
+        actionLabelTh: "เสนอ vendor",
+      },
+      {
+        id: "hist-po-1-2",
+        documentId: "po-1",
+        documentNumber: "PR-2026-000001",
+        documentType: "PR",
+        actorId: "u2",
+        actorName: "นางสาวปัทมา วัฒนสุข",
+        role: "Approver",
+        action: "Vendor Confirmed",
+        comment: "ยืนยัน vendor ที่เหมาะสมและสร้าง PO",
+        date: toISO(-6),
+        actionLabelTh: "ยืนยัน vendor",
+      },
+    ],
     createdAt: toISO(-8),
     updatedAt: toISO(-6),
     sentToVendorAt: toISO(-6),
+  },
+  {
+    id: "po-2",
+    documentNumber: "PR-2026-000002",
+    memoId: "memo-3",
+    memoTitle: "อะไหล่เครื่องบรรจุ และอุปกรณ์สำนักงาน",
+    vendorId: "v3",
+    vendorName: "บริษัท เอสที อินโนเวชั่น จำกัด",
+    procurementStatus: "Pending Vendor Approval",
+    amount: totalFromItems([
+      { quantity: 15, unitPrice: 3200 },
+      { quantity: 10, unitPrice: 180 },
+    ]),
+    prNumber: "PR-2026-000002",
+    poNumber: "PO-2026-000002",
+    selectedVendorId: undefined,
+    poApprovalRequired: true,
+    vendorProposals: [
+      createProposal({
+        id: "proposal-2",
+        vendorId: "v3",
+        vendorName: "บริษัท เอสที อินโนเวชั่น จำกัด",
+        quotedPrice: 49800,
+        leadTime: "5 วัน",
+        paymentTerms: "15 วัน",
+        notes: "ราคาดีที่สุด",
+        attachmentName: "st-innovation-proposal.pdf",
+        proposedById: "u3",
+        proposedByName: "นายวรพันธ์ นิ่มนวล",
+        createdAt: toISO(-13),
+      }),
+      createProposal({
+        id: "proposal-3",
+        vendorId: "v2",
+        vendorName: "หจก. สตาร์เวิร์ค โลจิสติกส์",
+        quotedPrice: 52500,
+        leadTime: "10 วัน",
+        paymentTerms: "45 วัน",
+        notes: "เครดิตเทอมดี",
+        attachmentName: "starwork-offer.pdf",
+        proposedById: "u3",
+        proposedByName: "นายวรพันธ์ นิ่มนวล",
+        createdAt: toISO(-13),
+      }),
+    ],
+    history: [
+      {
+        id: "hist-po-2-1",
+        documentId: "po-2",
+        documentNumber: "PR-2026-000002",
+        documentType: "PR",
+        actorId: "u3",
+        actorName: "นายวรพันธ์ นิ่มนวล",
+        role: "Purchasing",
+        action: "Vendor Proposed",
+        comment: "เพิ่ม vendor options ให้ผู้อนุมัติเลือก",
+        date: toISO(-13),
+        actionLabelTh: "เสนอ vendor",
+      },
+      {
+        id: "hist-po-2-2",
+        documentId: "po-2",
+        documentNumber: "PR-2026-000002",
+        documentType: "PR",
+        actorId: "u3",
+        actorName: "นายวรพันธ์ นิ่มนวล",
+        role: "Purchasing",
+        action: "Submitted for Vendor Approval",
+        comment: "ส่ง PR เพื่อให้ manager เลือก vendor",
+        date: toISO(-12),
+        actionLabelTh: "ส่งอนุมัติ vendor",
+      },
+    ],
+    createdAt: toISO(-16),
+    updatedAt: toISO(-12),
   },
 ];
 
@@ -392,4 +527,5 @@ export const initialStoreState = {
   paymentRequests,
   currentRole: defaultRole,
   currentUserId: defaultUserId,
+  isAuthenticated: false,
 };

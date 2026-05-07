@@ -3,12 +3,14 @@ import { ReactNode } from "react";
 interface DataTableProps {
   headers: string[];
   children: ReactNode;
+  className?: string;
+  tableClassName?: string;
 }
 
-export function DataTable({ headers, children }: DataTableProps) {
+export function DataTable({ headers, children, className = "", tableClassName = "" }: DataTableProps) {
   return (
-    <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm shadow-slate-100">
-      <table className="min-w-full border-separate border-spacing-0 text-left">
+    <div className={`overflow-x-auto rounded-3xl border border-slate-200 bg-white shadow-sm shadow-slate-100 ${className}`}>
+      <table className={`min-w-full border-separate border-spacing-0 text-left ${tableClassName}`}>
         <thead className="bg-slate-50 text-sm tracking-normal text-slate-500">
           <tr>
             {headers.map((header) => (

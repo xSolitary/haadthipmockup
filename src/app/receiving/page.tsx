@@ -15,7 +15,7 @@ export default function ReceivingPage() {
   const markQcPassed = useProcurementStore((state) => state.markQcPassed);
 
   const waitingOrders = useMemo(
-    () => purchaseOrders.filter((po) => ["Sent to Vendor", "PO Created", "Vendor Selected", "Receiving", "QC Pending"].includes(po.procurementStatus)),
+    () => purchaseOrders.filter((po) => ["PO Created", "Sent to Vendor", "Pending Receiving", "Received"].includes(po.procurementStatus)),
     [purchaseOrders],
   );
   const [selectedPoId, setSelectedPoId] = useState<string | null>(waitingOrders[0]?.id ?? null);
@@ -68,7 +68,7 @@ export default function ReceivingPage() {
                   <div className="flex items-center justify-between gap-3">
                     <div>
                       <p className="font-semibold text-slate-900">{po.documentNumber}</p>
-                      <p className="text-sm text-slate-500">{po.vendorName}</p>
+                  <p className="text-sm text-slate-500">{po.selectedVendorName ?? po.vendorName}</p>
                     </div>
                     <StatusBadge label={po.procurementStatus} />
                   </div>
@@ -86,7 +86,7 @@ export default function ReceivingPage() {
                   <div>
                     <p className="text-xs tracking-normal text-slate-400">{selectedOrder.documentNumber}</p>
                     <h2 className="mt-2 text-xl font-semibold text-slate-900">{selectedOrder.memoTitle}</h2>
-                    <p className="mt-2 text-sm text-slate-500">Vendor: {selectedOrder.vendorName}</p>
+                    <p className="mt-2 text-sm text-slate-500">Vendor: {selectedOrder.selectedVendorName ?? selectedOrder.vendorName}</p>
                   </div>
                   <StatusBadge label={selectedOrder.procurementStatus} />
                 </div>

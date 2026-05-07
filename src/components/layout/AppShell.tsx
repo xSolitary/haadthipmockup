@@ -1,14 +1,22 @@
 "use client";
 
 import { ReactNode } from "react";
+import { AuthGate } from "@/components/layout/AuthGate";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { Topbar } from "@/components/layout/Topbar";
+import { useProcurementStore } from "@/store/useProcurementStore";
 
 interface AppShellProps {
   children: ReactNode;
 }
 
 export function AppShell({ children }: AppShellProps) {
+  const isAuthenticated = useProcurementStore((state) => state.isAuthenticated);
+
+  if (!isAuthenticated) {
+    return <AuthGate />;
+  }
+
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900">
       <div className="flex min-h-screen">

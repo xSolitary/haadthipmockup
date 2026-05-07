@@ -16,17 +16,23 @@ export type MemoStatus =
 export type ProcurementStatus =
   | "Not Started"
   | "PR Created"
-  | "Vendor Selected"
+  | "Waiting for Purchasing to Propose Vendors"
+  | "Pending PR Approval"
+  | "Pending Vendor Approval"
+  | "Vendor Approved"
   | "PO Created"
+  | "Sent to Vendor"
+  | "Pending Receiving"
+  | "Received"
+  | "QC Passed"
+  | "Payment Pending"
+  | "Closed"
+  | "Vendor Selected"
   | "Pending PO Approval"
   | "PO Approved"
   | "PO Rejected"
-  | "Sent to Vendor"
   | "Receiving"
-  | "QC Pending"
-  | "QC Passed"
-  | "Payment Pending"
-  | "Closed";
+  | "QC Pending";
 
 export type ProcurementCategory =
   | "Raw Material"
@@ -66,14 +72,37 @@ export interface ApprovalHistory {
   id: string;
   documentId: string;
   documentNumber: string;
-  documentType: "Memo" | "PO";
+  documentType: "Memo" | "PR" | "PO";
   actorId: string;
   actorName: string;
   role: Role;
-  action: "Approved" | "Rejected" | "Revision Required" | "Submitted" | "Draft Saved";
+  action:
+    | "Approved"
+    | "Rejected"
+    | "Revision Required"
+    | "Submitted"
+    | "Draft Saved"
+    | "Vendor Proposed"
+    | "Submitted for Vendor Approval"
+    | "Vendor Confirmed";
   comment: string;
   date: string;
   actionLabelTh: string;
+}
+
+export interface VendorProposal {
+  id: string;
+  vendorId?: string | null;
+  vendorName: string;
+  quotedPrice: number;
+  leadTime: string;
+  paymentTerms: string;
+  notes: string;
+  attachmentName?: string;
+  attachmentUrl?: string;
+  proposedById: string;
+  proposedByName: string;
+  createdAt: string;
 }
 
 export interface MemoRequest {
@@ -137,10 +166,13 @@ export interface PurchaseOrder {
   sentToVendorAt?: string;
   quoteSelected?: string;
   selectedVendorId?: string;
+  selectedVendorName?: string;
   poNumber?: string;
   prNumber?: string;
   poApprovalStatus?: "Pending" | "Approved" | "Rejected";
-  requiresApproval?: boolean;
+  poApprovalRequired?: boolean;
+  vendorProposals: VendorProposal[];
+  history: ApprovalHistory[];
 }
 
 export interface ReceivingRecord {
@@ -194,6 +226,7 @@ export interface POApprovalRequest {
 export interface CurrentStoreState {
   currentRole: Role;
   currentUserId: string;
+  isAuthenticated: boolean;
 }
 
 export interface ProcurementState extends CurrentStoreState {
@@ -205,6 +238,8 @@ export interface ProcurementState extends CurrentStoreState {
   approvalHistory: ApprovalHistory[];
   receivingRecords: ReceivingRecord[];
   paymentRequests: PaymentRequest[];
+  loginAsRole: (role: Extract<Role, "Requester" | "Approver" | "Purchasing">) => void;
+  logout: () => void;
   switchRole: (role: Role) => void;
   createMemo: (memo: Omit<MemoRequest, "id" | "documentNumber" | "createdAt" | "updatedAt" | "history" | "procurementStatus" | "status" | "assignedApproverId" | "currentApproverName" | "estimatedTotal">) => void;
   saveDraft: (memoId: string, updates: Partial<MemoRequest>) => void;
@@ -213,8 +248,10 @@ export interface ProcurementState extends CurrentStoreState {
   rejectMemo: (memoId: string, comment: string) => void;
   requestRevision: (memoId: string, comment: string) => void;
   createPR: (memoId: string) => void;
+  addVendorProposal: (poId: string, proposal: Omit<VendorProposal, "id" | "proposedById" | "proposedByName" | "createdAt">) => void;
+  submitVendorProposals: (poId: string) => void;
+  approveVendorSelection: (poId: string, proposalId: string, comment: string) => void;
   selectVendor: (poId: string, vendorId: string) => void;
-  createPO: (poId: string) => void;
   sendPOForApproval: (poId: string) => void;
   approvePO: (poApprovalId: string, comment: string) => void;
   rejectPO: (poApprovalId: string, comment: string) => void;
