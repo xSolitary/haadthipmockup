@@ -7,8 +7,8 @@ import { ArrowRight, CalendarRange, FilePlus2, PackageSearch, Shapes, TimerReset
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
 import { useProcurementStore } from "@/store/useProcurementStore";
 
-const chartColors = ["#007946", "#0f766e", "#2563eb", "#f59e0b", "#dc2626", "#7c3aed", "#ea580c", "#0891b2"];
-const cardClassName = "rounded-[24px] border border-slate-200 bg-white shadow-sm shadow-slate-200/50";
+const chartColors = ["#007946", "#3a8f66", "#5d7ecf", "#c38f3c", "#c35d66", "#8a6ec4", "#d17b4f", "#5291a4"];
+const cardClassName = "rounded-[30px] border border-[var(--border)] bg-[var(--surface)] shadow-[var(--shadow-sm)]";
 
 const formatCurrency = (value: number) =>
   new Intl.NumberFormat("th-TH", { style: "currency", currency: "THB", maximumFractionDigits: 0 }).format(value);
@@ -19,7 +19,7 @@ function DashboardKpiCard({ label, value }: { label: string; value: string }) {
   return (
     <div className={`${cardClassName} flex h-36 flex-col justify-between p-5`}>
       <p className="text-sm font-medium tracking-normal text-slate-500">{label}</p>
-      <p className="text-[clamp(1.5rem,2vw,2rem)] font-bold leading-tight tracking-normal text-[#007946]">{value}</p>
+      <p className="text-[clamp(1.5rem,2vw,2rem)] font-bold leading-tight tracking-normal text-[var(--primary)]">{value}</p>
     </div>
   );
 }
@@ -40,20 +40,20 @@ function ActionCard({
   const content: ReactNode = (
     <>
       <div className="flex items-start justify-between gap-4">
-        <div className={`rounded-2xl p-3 ${muted ? "bg-slate-100 text-slate-500" : "bg-[#f0f9f6] text-[#007946]"}`}>
+        <div className={`rounded-2xl p-3 ${muted ? "bg-slate-100 text-slate-500" : "bg-[var(--surface-tint)] text-[var(--primary)]"}`}>
           <Icon className="h-5 w-5" />
         </div>
-        {!muted ? <ArrowRight className="h-4 w-4 text-slate-400 transition group-hover:translate-x-1 group-hover:text-[#007946]" /> : null}
+        {!muted ? <ArrowRight className="h-4 w-4 text-slate-400 transition group-hover:translate-x-1 group-hover:text-[var(--primary)]" /> : null}
       </div>
       <div className="space-y-2">
         <p className="text-base font-semibold tracking-normal text-slate-900">{title}</p>
-        <p className={`text-3xl font-bold leading-none tracking-normal ${muted ? "text-slate-500" : "text-[#007946]"}`}>{value}</p>
+        <p className={`text-3xl font-bold leading-none tracking-normal ${muted ? "text-slate-500" : "text-[var(--primary)]"}`}>{value}</p>
       </div>
     </>
   );
 
   const className = `${cardClassName} group flex h-48 flex-col justify-between p-5 transition ${
-    muted ? "cursor-default" : "hover:-translate-y-0.5 hover:border-[#007946]/20 hover:shadow-md"
+    muted ? "cursor-default" : "hover:-translate-y-0.5 hover:border-[#007946]/20 hover:shadow-[var(--shadow-md)]"
   }`;
 
   if (!href) {
@@ -170,10 +170,10 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-6 text-slate-900">
-      <section className={`${cardClassName} px-5 py-5 sm:px-6`}>
+      <section className={`${cardClassName} overflow-hidden px-5 py-5 sm:px-6`}>
         <div className="flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
           <div className="max-w-3xl">
-            <p className="text-sm font-medium tracking-normal text-[#007946]">Dashboard</p>
+            <p className="inline-flex rounded-full bg-[var(--surface-tint)] px-3 py-1 text-xs font-semibold tracking-[0.12em] text-[var(--primary-ink)]">Dashboard</p>
             <h1 className="mt-3 text-3xl font-bold tracking-normal text-slate-900 md:text-4xl">ภาพรวมการจัดซื้อ</h1>
             <p className="mt-2 text-sm leading-6 tracking-normal text-slate-500">
               ติดตาม KPI งานค้าง และโครงสร้างการใช้จ่ายตามช่วงวันที่ที่เลือก โดยยังคงใช้ข้อมูลเดิมจากระบบทั้งหมด
@@ -181,8 +181,8 @@ export default function DashboardPage() {
           </div>
 
           <div className="grid gap-3 sm:grid-cols-[auto_1fr_1fr] sm:items-center">
-            <div className="inline-flex h-10 items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-4 text-sm font-medium tracking-normal text-slate-600">
-              <CalendarRange className="h-4 w-4 text-[#007946]" />
+            <div className="inline-flex h-11 items-center gap-2 rounded-[18px] border border-[var(--border)] bg-[var(--surface-tint)] px-4 text-sm font-medium tracking-normal text-slate-700">
+              <CalendarRange className="h-4 w-4 text-[var(--primary)]" />
               Date Range
             </div>
             <input
@@ -190,14 +190,14 @@ export default function DashboardPage() {
               value={startDate}
               max={endDate}
               onChange={(event) => setStartDate(event.target.value)}
-              className="h-10 rounded-xl border border-slate-200 bg-white px-4 text-sm font-medium tracking-normal text-slate-700"
+              className="h-11 rounded-[18px] border border-[var(--border)] bg-[var(--surface-strong)] px-4 text-sm font-medium tracking-normal text-slate-700 shadow-[var(--shadow-sm)]"
             />
             <input
               type="date"
               value={endDate}
               min={startDate}
               onChange={(event) => setEndDate(event.target.value)}
-              className="h-10 rounded-xl border border-slate-200 bg-white px-4 text-sm font-medium tracking-normal text-slate-700"
+              className="h-11 rounded-[18px] border border-[var(--border)] bg-[var(--surface-strong)] px-4 text-sm font-medium tracking-normal text-slate-700 shadow-[var(--shadow-sm)]"
             />
           </div>
         </div>
@@ -215,12 +215,12 @@ export default function DashboardPage() {
       <section className="grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
         <div className="space-y-6">
           <section className={`${cardClassName} p-6`}>
-            <div className="flex items-center justify-between gap-4 border-b border-slate-200 pb-4">
+            <div className="flex items-center justify-between gap-4 border-b border-[var(--border)] pb-4">
               <div>
-                <p className="text-sm font-medium tracking-normal text-[#007946]">My Work Queue</p>
+                <p className="text-sm font-medium tracking-normal text-[var(--primary)]">My Work Queue</p>
                 <h2 className="mt-1 text-2xl font-bold tracking-normal text-slate-900">Action Required from Me</h2>
               </div>
-              <div className="hidden rounded-2xl bg-[#f0f9f6] p-3 text-[#007946] md:block">
+              <div className="hidden rounded-2xl bg-[var(--surface-tint)] p-3 text-[var(--primary)] md:block">
                 <TrendingUp className="h-5 w-5" />
               </div>
             </div>
@@ -236,10 +236,10 @@ export default function DashboardPage() {
           <section className={`${cardClassName} p-6`}>
             <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
               <div>
-                <p className="text-sm font-medium tracking-normal text-[#007946]">System Status</p>
+                <p className="text-sm font-medium tracking-normal text-[var(--primary)]">System Status</p>
                 <h2 className="mt-1 text-xl font-bold tracking-normal text-slate-900">ERP / Inventory Status</h2>
               </div>
-              <span className="inline-flex rounded-full bg-[#f0f9f6] px-3 py-1 text-xs font-medium tracking-normal text-[#007946]">Operational</span>
+              <span className="inline-flex rounded-full bg-[var(--surface-tint)] px-3 py-1 text-xs font-medium tracking-normal text-[var(--primary-ink)]">Operational</span>
             </div>
 
             <div className="mt-5 grid gap-4 sm:grid-cols-2">
@@ -249,7 +249,7 @@ export default function DashboardPage() {
                 { label: "Vendor Master", value: "Ready" },
                 { label: "Budget Control", value: "Active" },
               ].map((item) => (
-                <div key={item.label} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                <div key={item.label} className="rounded-[22px] border border-[var(--border)] bg-[var(--surface-muted)] p-4">
                   <p className="text-xs font-medium tracking-normal text-slate-500">{item.label}</p>
                   <p className="mt-2 text-lg font-semibold tracking-normal text-slate-900">{item.value}</p>
                 </div>
@@ -260,14 +260,14 @@ export default function DashboardPage() {
 
         <section className={`${cardClassName} overflow-hidden p-6`}>
           <div className="flex flex-col gap-2">
-            <p className="text-sm font-medium tracking-normal text-[#007946]">Spend Insight</p>
+            <p className="text-sm font-medium tracking-normal text-[var(--primary)]">Spend Insight</p>
             <h2 className="text-xl font-bold tracking-normal text-slate-900">Category Spend Mix</h2>
             <p className="text-sm leading-6 tracking-normal text-slate-500">
               กราฟสรุปสัดส่วนการใช้จ่ายตามหมวดจัดซื้อในช่วงวันที่ที่เลือก พร้อมคำอธิบายสั้น ๆ เพื่อช่วยมองเห็นความเสี่ยงและแนวทางถัดไป
             </p>
           </div>
 
-          <div className="mt-6 rounded-[24px] border border-slate-200 bg-slate-50 p-5">
+          <div className="mt-6 rounded-[28px] border border-[var(--border)] bg-[var(--surface-muted)] p-5">
             <div className="h-[320px]">
               {isChartReady ? (
                 pieData.length > 0 ? (
@@ -282,12 +282,12 @@ export default function DashboardPage() {
                     </PieChart>
                   </ResponsiveContainer>
                 ) : (
-                  <div className="flex h-full items-center justify-center rounded-3xl border border-dashed border-slate-300 bg-white text-sm tracking-normal text-slate-400">
+                  <div className="flex h-full items-center justify-center rounded-3xl border border-dashed border-slate-300 bg-[var(--surface-strong)] text-sm tracking-normal text-slate-400">
                     ยังไม่มีข้อมูลในช่วงวันที่ที่เลือก
                   </div>
                 )
               ) : (
-                <div className="flex h-full items-center justify-center rounded-3xl border border-dashed border-slate-300 bg-white text-sm tracking-normal text-slate-400">
+                <div className="flex h-full items-center justify-center rounded-3xl border border-dashed border-slate-300 bg-[var(--surface-strong)] text-sm tracking-normal text-slate-400">
                   Preparing chart...
                 </div>
               )}
@@ -296,7 +296,7 @@ export default function DashboardPage() {
             <div className="mt-5 space-y-3">
               <h3 className="text-sm font-semibold tracking-normal text-slate-900">Graph Explanation</h3>
               <div className="grid gap-3">
-                <div className="rounded-2xl bg-white p-4">
+                <div className="rounded-[22px] bg-[var(--surface-strong)] p-4 shadow-[var(--shadow-sm)]">
                   <p className="text-xs font-medium tracking-normal text-slate-500">หมวดใช้จ่ายสูงสุด</p>
                   <p className="mt-2 text-sm font-semibold tracking-normal text-slate-900">
                     {topCategory
@@ -304,7 +304,7 @@ export default function DashboardPage() {
                       : "ยังไม่มีข้อมูลในช่วงวันที่ที่เลือก"}
                   </p>
                 </div>
-                <div className="rounded-2xl bg-white p-4">
+                <div className="rounded-[22px] bg-[var(--surface-strong)] p-4 shadow-[var(--shadow-sm)]">
                   <p className="text-xs font-medium tracking-normal text-slate-500">ความเสี่ยง / Insight</p>
                   <p className="mt-2 text-sm leading-6 tracking-normal text-slate-700">
                     {topCategory && topCategoryGap !== null && topCategoryGap > 15
@@ -312,7 +312,7 @@ export default function DashboardPage() {
                       : categoryInsight}
                   </p>
                 </div>
-                <div className="rounded-2xl bg-white p-4">
+                <div className="rounded-[22px] bg-[var(--surface-strong)] p-4 shadow-[var(--shadow-sm)]">
                   <p className="text-xs font-medium tracking-normal text-slate-500">Suggested Action</p>
                   <p className="mt-2 text-sm leading-6 tracking-normal text-slate-700">{suggestedAction}</p>
                 </div>
@@ -322,7 +322,7 @@ export default function DashboardPage() {
             {pieData.length > 0 ? (
               <div className="mt-5 grid gap-3 md:grid-cols-2">
                 {pieData.slice(0, 4).map((item, index) => (
-                  <div key={item.name} className="flex items-center justify-between gap-3 rounded-2xl bg-white px-4 py-3">
+                  <div key={item.name} className="flex items-center justify-between gap-3 rounded-[22px] bg-[var(--surface-strong)] px-4 py-3 shadow-[var(--shadow-sm)]">
                     <div className="flex items-center gap-3">
                       <span className="h-3.5 w-3.5 rounded-full" style={{ backgroundColor: chartColors[index % chartColors.length] }} />
                       <div>
@@ -330,7 +330,7 @@ export default function DashboardPage() {
                         <p className="text-xs tracking-normal text-slate-500">{formatCurrency(item.value)}</p>
                       </div>
                     </div>
-                    <p className="text-sm font-semibold tracking-normal text-[#007946]">{item.percent.toFixed(1)}%</p>
+                    <p className="text-sm font-semibold tracking-normal text-[var(--primary)]">{item.percent.toFixed(1)}%</p>
                   </div>
                 ))}
               </div>

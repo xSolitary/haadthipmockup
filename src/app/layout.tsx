@@ -1,11 +1,17 @@
 import type { Metadata } from "next";
-import { Geist_Mono } from "next/font/google";
+import { Geist_Mono, Sarabun } from "next/font/google";
 import "./globals.css";
 import { AppShell } from "@/components/layout/AppShell";
 
 const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
   subsets: ["latin"],
+});
+
+const sarabun = Sarabun({
+  variable: "--font-sarabun",
+  subsets: ["latin", "thai"],
+  weight: ["300", "400", "500", "600", "700"],
 });
 
 export const metadata: Metadata = {
@@ -21,9 +27,9 @@ export default function RootLayout({
   return (
     <html
       lang="th"
-      className={`${geistMono.variable} h-full antialiased`}
+      className={`${geistMono.variable} ${sarabun.variable} h-full antialiased`}
     >
-      <body className="min-h-full bg-slate-50 text-slate-900">
+      <body className="min-h-full bg-[var(--background)] text-slate-900">
         <AppShell>{children}</AppShell>
       </body>
     </html>

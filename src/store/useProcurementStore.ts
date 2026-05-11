@@ -2,6 +2,7 @@ import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 import type { StateStorage } from "zustand/middleware";
 import { apiFetch } from "@/lib/api";
+import { findMockAccount } from "@/lib/mock-auth";
 import { defaultRole, defaultUserId, initialStoreState } from "@/lib/mock-data";
 import type {
   PaymentRequest,
@@ -18,10 +19,11 @@ const noopStorage: StateStorage = {
   removeItem: () => undefined,
 };
 
-const allowedLoginRoles: Array<Extract<Role, "Requester" | "Approver" | "Purchasing">> = [
+const allowedLoginRoles: Array<Extract<Role, "Requester" | "Approver" | "Purchasing" | "Finance">> = [
   "Requester",
   "Approver",
   "Purchasing",
+  "Finance",
 ];
 
 function getBaseState() {
@@ -31,6 +33,7 @@ function getBaseState() {
   } as unknown as Omit<
     ProcurementState,
     | "initializeData"
+    | "login"
     | "loginAsRole"
     | "logout"
     | "switchRole"
@@ -99,11 +102,33 @@ export const useProcurementStore = create<ProcurementState>()(
           set({ isSyncing: false });
         }
       },
+      login: (username, password) => {
+        const account = findMockAccount(username, password);
+
+        if (!account) {
+          return {
+            success: false,
+            error: "ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง กรุณาลองใหม่อีกครั้ง",
+          };
+        }
+
+        const user = getUserForRole(get(), account.role);
+
+        set({
+          currentRole: account.role,
+          currentUserId: user?.id ?? defaultUserId,
+          currentUsername: account.username,
+          isAuthenticated: true,
+        });
+
+        return { success: true };
+      },
       loginAsRole: (role) => {
         const user = getUserForRole(get(), role);
         set({
           currentRole: role,
           currentUserId: user?.id ?? defaultUserId,
+          currentUsername: role.toLowerCase(),
           isAuthenticated: true,
         });
       },
@@ -111,6 +136,7 @@ export const useProcurementStore = create<ProcurementState>()(
         set({
           currentRole: defaultRole,
           currentUserId: defaultUserId,
+          currentUsername: null,
           isAuthenticated: false,
         });
       },
@@ -119,8 +145,9 @@ export const useProcurementStore = create<ProcurementState>()(
         set({
           currentRole: role,
           currentUserId: user?.id ?? defaultUserId,
+          currentUsername: role.toLowerCase(),
           isAuthenticated: allowedLoginRoles.includes(
-            role as Extract<Role, "Requester" | "Approver" | "Purchasing">,
+            role as Extract<Role, "Requester" | "Approver" | "Purchasing" | "Finance">,
           ),
         });
       },
@@ -309,6 +336,7 @@ export const useProcurementStore = create<ProcurementState>()(
       partialize: (state) => ({
         currentRole: state.currentRole,
         currentUserId: state.currentUserId,
+        currentUsername: state.currentUsername,
         isAuthenticated: state.isAuthenticated,
       }),
       merge: (persistedState, currentState) => ({

@@ -527,5 +527,6 @@ export const initialStoreState = {
   paymentRequests,
   currentRole: defaultRole,
   currentUserId: defaultUserId,
+  currentUsername: null,
   isAuthenticated: false,
 };

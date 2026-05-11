@@ -2,12 +2,12 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import { Download, Eye, Pencil, Plus, X } from "lucide-react";
+import { Download, Eye, Pencil, Plus, Search, X } from "lucide-react";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { DataTable } from "@/components/ui/DataTable";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { useProcurementStore } from "@/store/useProcurementStore";
-import type { PurchaseOrder } from "@/lib/types";
+import type { MemoRequest, PurchaseOrder } from "@/lib/types";
 
 type ProcureTab = "memo" | "pr" | "po";
 type DetailState =
@@ -44,17 +44,27 @@ function SummaryTabCard({
     <button
       type="button"
       onClick={onClick}
-      className={`min-w-[180px] flex-1 rounded-[24px] border px-5 py-5 text-left transition ${
+      className={`relative flex h-[80px] w-full items-start justify-between overflow-hidden rounded-xl border px-4 py-3 text-left transition ${
         active
-          ? "border-[#007946] bg-gradient-to-br from-[#007946] to-[#0a8f57] text-white shadow-[0_18px_40px_rgba(0,121,70,0.18)]"
-          : "border-slate-200 bg-[#f8fbf9] text-slate-900 shadow-sm shadow-slate-200/50 hover:border-[#007946]/20 hover:bg-white"
+          ? "border-[#007946]/30 bg-[linear-gradient(180deg,#ffffff_0%,#f4fbf7_100%)] shadow-[0_10px_24px_rgba(15,23,42,0.06)]"
+          : "border-slate-200 bg-white shadow-[0_6px_18px_rgba(15,23,42,0.04)] hover:border-[#007946]/20 hover:bg-[#fbfdfc]"
       }`}
     >
-      <div className="text-[1.85rem] font-semibold leading-none">
-        {label}
-        {pendingCount > 0 ? ` (${pendingCount})` : ""}
+      <span className={`absolute inset-x-0 top-0 h-1 ${active ? "bg-[#007946]" : "bg-transparent"}`} />
+      <div className="min-w-0">
+        <div className="flex items-center gap-2">
+          <span className="truncate text-sm font-semibold text-slate-900">{label}</span>
+          <span
+            className={`inline-flex min-w-6 items-center justify-center rounded-full px-2 py-0.5 text-[11px] font-semibold ${
+              active ? "bg-[#e3f3eb] text-[#0d5738]" : "bg-slate-100 text-slate-600"
+            }`}
+          >
+            {pendingCount}
+          </span>
+        </div>
+        <p className="mt-2 text-xs text-slate-500">{count} items</p>
       </div>
-      <div className={`mt-2 text-sm ${active ? "text-white/80" : "text-slate-500"}`}>{count} items</div>
+      <div className={`mt-0.5 h-8 w-8 rounded-lg border ${active ? "border-[#cce5d7] bg-[#f3fbf7]" : "border-slate-200 bg-slate-50"}`} />
     </button>
   );
 }
@@ -69,19 +79,19 @@ function DetailModal({
   children: React.ReactNode;
 }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4 backdrop-blur-sm">
-      <div className="max-h-[92vh] w-full max-w-5xl overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-[0_30px_80px_rgba(15,23,42,0.18)]">
-        <div className="flex items-center justify-between border-b border-slate-200 px-6 py-5">
-          <h2 className="text-xl font-semibold text-slate-900">{title}</h2>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/32 p-4 backdrop-blur-sm">
+      <div className="max-h-[92vh] w-full max-w-5xl overflow-hidden rounded-xl border border-slate-200 bg-white shadow-[0_24px_64px_rgba(15,23,42,0.14)]">
+        <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
+          <h2 className="text-lg font-semibold text-slate-900">{title}</h2>
           <button
             type="button"
             onClick={onClose}
-            className="rounded-xl border border-slate-200 p-2 text-slate-500 transition hover:border-slate-300 hover:bg-slate-50 hover:text-slate-900"
+            className="rounded-lg border border-slate-200 p-2 text-slate-500 transition hover:border-slate-300 hover:bg-slate-50 hover:text-slate-900"
           >
-            <X className="h-5 w-5" />
+            <X className="h-4 w-4" />
           </button>
         </div>
-        <div className="max-h-[calc(92vh-88px)] overflow-y-auto px-6 py-6">{children}</div>
+        <div className="max-h-[calc(92vh-72px)] overflow-y-auto px-5 py-5">{children}</div>
       </div>
     </div>
   );
@@ -89,11 +99,67 @@ function DetailModal({
 
 function InfoCard({ label, value }: { label: string; value: React.ReactNode }) {
   return (
-    <div className="rounded-[20px] border border-slate-200/80 bg-slate-50 p-4">
-      <p className="text-xs text-slate-400">{label}</p>
-      <div className="mt-2 font-semibold text-slate-900">{value}</div>
+    <div className="rounded-xl border border-slate-200 bg-slate-50/80 p-4">
+      <p className="text-xs text-slate-500">{label}</p>
+      <div className="mt-1.5 font-semibold text-slate-900">{value}</div>
     </div>
   );
+}
+
+function ActionIconLink({ href, icon }: { href: string; icon: React.ReactNode }) {
+  return (
+    <Link
+      href={href}
+      className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 transition hover:border-[#007946]/25 hover:bg-[#f4fbf7] hover:text-[#007946]"
+    >
+      {icon}
+    </Link>
+  );
+}
+
+function ActionIconButton({ onClick, icon }: { onClick: () => void; icon: React.ReactNode }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 transition hover:border-[#007946]/25 hover:bg-[#f4fbf7] hover:text-[#007946]"
+    >
+      {icon}
+    </button>
+  );
+}
+
+function matchesMemoSearch(memo: MemoRequest, searchTerm: string) {
+  if (!searchTerm) return true;
+  const query = searchTerm.toLowerCase();
+  return [
+    memo.documentNumber,
+    memo.title,
+    memo.site,
+    memo.department,
+    memo.status,
+    memo.procurementStatus,
+  ]
+    .join(" ")
+    .toLowerCase()
+    .includes(query);
+}
+
+function matchesPoSearch(po: PurchaseOrder, searchTerm: string) {
+  if (!searchTerm) return true;
+  const query = searchTerm.toLowerCase();
+  return [
+    po.documentNumber,
+    po.prNumber ?? "",
+    po.poNumber ?? "",
+    po.memoTitle,
+    po.selectedVendorName ?? "",
+    po.vendorName,
+    po.procurementStatus,
+  ]
+    .join(" ")
+    .toLowerCase()
+    .includes(query);
 }
 
 export function ProcureToPayPage({ initialTab = "memo" }: { initialTab?: ProcureTab }) {
@@ -104,6 +170,8 @@ export function ProcureToPayPage({ initialTab = "memo" }: { initialTab?: Procure
 
   const [activeTab, setActiveTab] = useState<ProcureTab>(initialTab);
   const [detailState, setDetailState] = useState<DetailState>(null);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
 
   const memoById = useMemo(() => new Map(memos.map((memo) => [memo.id, memo])), [memos]);
   const availableTabs: ProcureTab[] =
@@ -179,7 +247,10 @@ export function ProcureToPayPage({ initialTab = "memo" }: { initialTab?: Procure
   }, [currentRole, purchaseOrders]);
 
   const poPendingCount = useMemo(
-    () => purchaseOrders.filter((po) => ["PO Created", "Sent to Vendor", "Pending Receiving", "Received"].includes(po.procurementStatus)).length,
+    () =>
+      purchaseOrders.filter((po) =>
+        ["PO Created", "Sent to Vendor", "Pending Receiving", "Received"].includes(po.procurementStatus),
+      ).length,
     [purchaseOrders],
   );
 
@@ -191,6 +262,42 @@ export function ProcureToPayPage({ initialTab = "memo" }: { initialTab?: Procure
   const visibleTabs = tabMeta.filter((tab) => availableTabs.includes(tab.id));
   const currentTab = availableTabs.includes(activeTab) ? activeTab : availableTabs[0];
 
+  const filteredMemoRequests = useMemo(
+    () =>
+      memoRequests.filter(
+        (memo) => matchesMemoSearch(memo, searchTerm) && (statusFilter === "all" || memo.status === statusFilter),
+      ),
+    [memoRequests, searchTerm, statusFilter],
+  );
+
+  const filteredPrItems = useMemo(
+    () =>
+      prItems.filter(
+        (po) => matchesPoSearch(po, searchTerm) && (statusFilter === "all" || po.procurementStatus === statusFilter),
+      ),
+    [prItems, searchTerm, statusFilter],
+  );
+
+  const filteredPoItems = useMemo(
+    () =>
+      poItems.filter(
+        (po) => matchesPoSearch(po, searchTerm) && (statusFilter === "all" || po.procurementStatus === statusFilter),
+      ),
+    [poItems, searchTerm, statusFilter],
+  );
+
+  const statusOptions = useMemo(() => {
+    const values =
+      currentTab === "memo"
+        ? memoRequests.map((memo) => memo.status)
+        : currentTab === "pr"
+          ? prItems.map((po) => po.procurementStatus)
+          : poItems.map((po) => po.procurementStatus);
+    return [...new Set(values)];
+  }, [currentTab, memoRequests, poItems, prItems]);
+
+  const hasBaseItems = currentTab === "memo" ? memoRequests.length > 0 : currentTab === "pr" ? prItems.length > 0 : poItems.length > 0;
+
   const openDetail = (type: "memo" | "pr" | "po", id: string) => {
     if (type !== activeTab) {
       setActiveTab(type);
@@ -201,7 +308,15 @@ export function ProcureToPayPage({ initialTab = "memo" }: { initialTab?: Procure
   const closeDetail = () => {
     setDetailState(null);
   };
+
+  const switchTab = (tab: ProcureTab) => {
+    setActiveTab(tab);
+    setSearchTerm("");
+    setStatusFilter("all");
+  };
+
   const canCreateMemo = currentRole === "Requester";
+
   const getMemoActionHref = (memoId: string) => {
     const memo = memos.find((item) => item.id === memoId);
     if (!memo) return null;
@@ -213,6 +328,7 @@ export function ProcureToPayPage({ initialTab = "memo" }: { initialTab?: Procure
     }
     return null;
   };
+
   const getPrActionHref = (poId: string) => {
     const po = purchaseOrders.find((item) => item.id === poId);
     if (!po) return null;
@@ -224,24 +340,16 @@ export function ProcureToPayPage({ initialTab = "memo" }: { initialTab?: Procure
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <PageHeader
         title="Procure-to-Pay"
         subtitle="รวม Memo Request, PR และ PO ของทุกขั้นตอนในกระบวนการจัดซื้อ"
-        actions={
-          canCreateMemo ? (
-            <Link
-              href="/memo/create"
-              className="inline-flex h-10 items-center gap-2 rounded-xl bg-[#007946] px-4 text-sm font-semibold text-white shadow-sm shadow-emerald-900/10 transition hover:bg-[#005f37]"
-            >
-              <Plus className="h-4 w-4" /> Create Memo
-            </Link>
-          ) : null
-        }
+        className="rounded-xl px-5 py-5 shadow-[0_10px_24px_rgba(15,23,42,0.05)]"
+        contentClassName="gap-3"
       />
 
-      <section className="rounded-[24px] border border-slate-200 bg-white p-5 shadow-sm shadow-slate-200/50 sm:p-6">
-        <div className="mb-6 flex flex-wrap gap-3 xl:flex-nowrap">
+      <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-[0_12px_32px_rgba(15,23,42,0.05)] sm:p-5">
+        <div className="grid gap-3 md:grid-cols-3">
           {visibleTabs.map((tab) => (
             <SummaryTabCard
               key={tab.id}
@@ -249,157 +357,208 @@ export function ProcureToPayPage({ initialTab = "memo" }: { initialTab?: Procure
               label={tab.label}
               count={tab.count}
               pendingCount={tab.pendingCount}
-              onClick={() => setActiveTab(tab.id)}
+              onClick={() => switchTab(tab.id)}
             />
           ))}
         </div>
 
-        {currentTab === "memo" ? (
-          memoRequests.length === 0 ? (
-            <p className="rounded-[20px] border border-dashed border-slate-200 bg-slate-50 px-4 py-8 text-center text-sm text-slate-500">ยังไม่มี memo ที่ต้องจัดการสำหรับบทบาทนี้</p>
-          ) : (
-            <DataTable
-              headers={["เลขที่", "หัวข้อ", "ไซต์", "ยอด", "สถานะ", ""]}
-              tableClassName="min-w-[920px]"
-            >
-              {memoRequests.map((memo) => (
-                <tr key={memo.id} className="border-t border-slate-100 transition hover:bg-[#f8fcf9]">
-                  <td className="px-5 py-4 text-slate-700">{memo.documentNumber}</td>
-                  <td className="px-5 py-4 font-medium text-slate-900">{memo.title}</td>
-                  <td className="px-5 py-4">{memo.site}</td>
-                  <td className="px-5 py-4">{formatCurrency(memo.estimatedTotal)}</td>
-                  <td className="px-5 py-4">
-                    <StatusBadge label={memo.status} />
-                  </td>
-                  <td className="px-5 py-4 text-right">
-                    <div className="flex justify-end gap-2">
-                      {getMemoActionHref(memo.id) ? (
-                        <Link href={getMemoActionHref(memo.id) ?? "#"} className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 transition hover:border-[#007946]/20 hover:bg-[#f0f9f6] hover:text-[#007946]">
-                          <Pencil className="h-4 w-4" />
-                        </Link>
-                      ) : null}
-                      <button
-                        type="button"
-                        onClick={() => openDetail("memo", memo.id)}
-                        className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 transition hover:border-[#007946]/20 hover:bg-[#f0f9f6] hover:text-[#007946]"
-                      >
-                        <Eye className="h-5 w-5" />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </DataTable>
-          )
-        ) : null}
+        <div className="mt-4 flex flex-col gap-3 border-t border-slate-100 pt-4 xl:flex-row xl:items-center xl:justify-between">
+          <div className="flex flex-1 flex-col gap-3 lg:flex-row">
+            <label className="relative block w-full lg:max-w-sm">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+              <input
+                value={searchTerm}
+                onChange={(event) => setSearchTerm(event.target.value)}
+                placeholder={`Search ${currentTab.toUpperCase()}...`}
+                className="h-10 w-full rounded-xl border border-slate-200 bg-white pl-9 pr-3 text-sm text-slate-900 placeholder:text-slate-400"
+              />
+            </label>
 
-        {currentTab === "pr" ? (
-          prItems.length === 0 ? (
-            <p className="rounded-[20px] border border-dashed border-slate-200 bg-slate-50 px-4 py-8 text-center text-sm text-slate-500">ยังไม่มี PR สำหรับบทบาทนี้</p>
-          ) : (
-            <DataTable
-              headers={["PR", "หัวข้อ", "Vendor Options", "Selected Vendor", "สถานะ", ""]}
-              tableClassName="min-w-[1040px]"
+            <select
+              value={statusFilter}
+              onChange={(event) => setStatusFilter(event.target.value)}
+              className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-700 lg:w-56"
             >
-              {prItems.map((po) => (
-                <tr key={po.id} className="border-t border-slate-100 transition hover:bg-[#f8fcf9]">
-                  <td className="px-5 py-4 text-slate-700">{po.prNumber ?? po.documentNumber}</td>
-                  <td className="px-5 py-4 font-medium text-slate-900">{po.memoTitle}</td>
-                  <td className="px-5 py-4">{po.vendorProposals.length}</td>
-                  <td className="px-5 py-4">{po.selectedVendorName ?? "-"}</td>
-                  <td className="px-5 py-4">
-                    <StatusBadge label={po.procurementStatus} />
-                  </td>
-                  <td className="px-5 py-4 text-right">
-                    <div className="flex justify-end gap-2">
-                      {getPrActionHref(po.id) ? (
-                        <Link href={getPrActionHref(po.id) ?? "#"} className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 transition hover:border-[#007946]/20 hover:bg-[#f0f9f6] hover:text-[#007946]">
-                          <Pencil className="h-4 w-4" />
-                        </Link>
-                      ) : null}
-                      <button
-                        type="button"
-                        onClick={() => openDetail("pr", po.id)}
-                        className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 transition hover:border-[#007946]/20 hover:bg-[#f0f9f6] hover:text-[#007946]"
-                      >
-                        <Eye className="h-5 w-5" />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
+              <option value="all">All statuses</option>
+              {statusOptions.map((status) => (
+                <option key={status} value={status}>
+                  {status}
+                </option>
               ))}
-            </DataTable>
-          )
-        ) : null}
+            </select>
+          </div>
 
-        {currentTab === "po" ? (
-          poItems.length === 0 ? (
-            <p className="rounded-[20px] border border-dashed border-slate-200 bg-slate-50 px-4 py-8 text-center text-sm text-slate-500">ยังไม่มี PO ในช่วงนี้</p>
-          ) : (
-            <DataTable
-              headers={["PO", "หัวข้อ", "Vendor", "ยอด", "สถานะ", ""]}
-              tableClassName="min-w-[1040px]"
+          {canCreateMemo ? (
+            <Link
+              href="/memo/create"
+              className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-[#007946] px-4 text-sm font-semibold text-white shadow-sm shadow-emerald-900/10 transition hover:bg-[#00643a]"
             >
-              {poItems.map((po) => (
-                <tr key={po.id} className="border-t border-slate-100 transition hover:bg-[#f8fcf9]">
-                  <td className="px-5 py-4 text-slate-700">{po.poNumber ?? po.documentNumber}</td>
-                  <td className="px-5 py-4 font-medium text-slate-900">{po.memoTitle}</td>
-                  <td className="px-5 py-4">{po.selectedVendorName ?? po.vendorName}</td>
-                  <td className="px-5 py-4">{formatCurrency(po.amount)}</td>
-                  <td className="px-5 py-4">
-                    <StatusBadge label={po.procurementStatus} />
-                  </td>
-                  <td className="px-5 py-4 text-right">
-                    <button
-                      type="button"
-                      onClick={() => openDetail("po", po.id)}
-                      className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 transition hover:border-[#007946]/20 hover:bg-[#f0f9f6] hover:text-[#007946]"
-                    >
-                      <Eye className="h-5 w-5" />
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </DataTable>
-          )
-        ) : null}
+              <Plus className="h-4 w-4" /> Create Memo
+            </Link>
+          ) : null}
+        </div>
+
+        <div className="mt-4">
+          {currentTab === "memo" ? (
+            !hasBaseItems ? (
+              <p className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-4 py-8 text-center text-sm text-slate-500">
+                ยังไม่มี memo ที่ต้องจัดการสำหรับบทบาทนี้
+              </p>
+            ) : filteredMemoRequests.length === 0 ? (
+              <p className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-4 py-8 text-center text-sm text-slate-500">
+                ไม่พบรายการที่ตรงกับคำค้นหาหรือตัวกรอง
+              </p>
+            ) : (
+              <DataTable
+                headers={["เลขที่", "หัวข้อ", "ไซต์", "ยอด", "สถานะ", ""]}
+                className="rounded-xl border-slate-200 shadow-none"
+                headerClassName="bg-[rgba(244,249,246,0.96)]"
+                headerCellClassName="px-4 py-3 text-xs font-semibold text-slate-500"
+                bodyClassName="[&_td]:py-3"
+                tableClassName="min-w-[920px]"
+              >
+                {filteredMemoRequests.map((memo) => (
+                  <tr key={memo.id} className="border-t border-slate-100 transition hover:bg-[#fafdfb]">
+                    <td className="px-4 text-slate-700">{memo.documentNumber}</td>
+                    <td className="px-4 font-medium text-slate-900">{memo.title}</td>
+                    <td className="px-4">{memo.site}</td>
+                    <td className="px-4">{formatCurrency(memo.estimatedTotal)}</td>
+                    <td className="px-4">
+                      <StatusBadge label={memo.status} className="min-h-7 min-w-0 px-2.5 text-[11px]" />
+                    </td>
+                    <td className="px-4 text-right">
+                      <div className="flex justify-end gap-2">
+                        {getMemoActionHref(memo.id) ? <ActionIconLink href={getMemoActionHref(memo.id) ?? "#"} icon={<Pencil className="h-4 w-4" />} /> : null}
+                        <ActionIconButton onClick={() => openDetail("memo", memo.id)} icon={<Eye className="h-4 w-4" />} />
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </DataTable>
+            )
+          ) : null}
+
+          {currentTab === "pr" ? (
+            !hasBaseItems ? (
+              <p className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-4 py-8 text-center text-sm text-slate-500">
+                ยังไม่มี PR สำหรับบทบาทนี้
+              </p>
+            ) : filteredPrItems.length === 0 ? (
+              <p className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-4 py-8 text-center text-sm text-slate-500">
+                ไม่พบรายการที่ตรงกับคำค้นหาหรือตัวกรอง
+              </p>
+            ) : (
+              <DataTable
+                headers={["PR", "หัวข้อ", "Vendor Options", "Selected Vendor", "สถานะ", ""]}
+                className="rounded-xl border-slate-200 shadow-none"
+                headerClassName="bg-[rgba(244,249,246,0.96)]"
+                headerCellClassName="px-4 py-3 text-xs font-semibold text-slate-500"
+                bodyClassName="[&_td]:py-3"
+                tableClassName="min-w-[1040px]"
+              >
+                {filteredPrItems.map((po) => (
+                  <tr key={po.id} className="border-t border-slate-100 transition hover:bg-[#fafdfb]">
+                    <td className="px-4 text-slate-700">{po.prNumber ?? po.documentNumber}</td>
+                    <td className="px-4 font-medium text-slate-900">{po.memoTitle}</td>
+                    <td className="px-4">{po.vendorProposals.length}</td>
+                    <td className="px-4">{po.selectedVendorName ?? "-"}</td>
+                    <td className="px-4">
+                      <StatusBadge label={po.procurementStatus} className="min-h-7 min-w-0 px-2.5 text-[11px]" />
+                    </td>
+                    <td className="px-4 text-right">
+                      <div className="flex justify-end gap-2">
+                        {getPrActionHref(po.id) ? <ActionIconLink href={getPrActionHref(po.id) ?? "#"} icon={<Pencil className="h-4 w-4" />} /> : null}
+                        <ActionIconButton onClick={() => openDetail("pr", po.id)} icon={<Eye className="h-4 w-4" />} />
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </DataTable>
+            )
+          ) : null}
+
+          {currentTab === "po" ? (
+            !hasBaseItems ? (
+              <p className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-4 py-8 text-center text-sm text-slate-500">
+                ยังไม่มี PO ในช่วงนี้
+              </p>
+            ) : filteredPoItems.length === 0 ? (
+              <p className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-4 py-8 text-center text-sm text-slate-500">
+                ไม่พบรายการที่ตรงกับคำค้นหาหรือตัวกรอง
+              </p>
+            ) : (
+              <DataTable
+                headers={["PO", "หัวข้อ", "Vendor", "ยอด", "สถานะ", ""]}
+                className="rounded-xl border-slate-200 shadow-none"
+                headerClassName="bg-[rgba(244,249,246,0.96)]"
+                headerCellClassName="px-4 py-3 text-xs font-semibold text-slate-500"
+                bodyClassName="[&_td]:py-3"
+                tableClassName="min-w-[1040px]"
+              >
+                {filteredPoItems.map((po) => (
+                  <tr key={po.id} className="border-t border-slate-100 transition hover:bg-[#fafdfb]">
+                    <td className="px-4 text-slate-700">{po.poNumber ?? po.documentNumber}</td>
+                    <td className="px-4 font-medium text-slate-900">{po.memoTitle}</td>
+                    <td className="px-4">{po.selectedVendorName ?? po.vendorName}</td>
+                    <td className="px-4">{formatCurrency(po.amount)}</td>
+                    <td className="px-4">
+                      <StatusBadge label={po.procurementStatus} className="min-h-7 min-w-0 px-2.5 text-[11px]" />
+                    </td>
+                    <td className="px-4 text-right">
+                      <div className="flex justify-end gap-2">
+                        <ActionIconButton onClick={() => openDetail("po", po.id)} icon={<Eye className="h-4 w-4" />} />
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </DataTable>
+            )
+          ) : null}
+        </div>
       </section>
 
       {selectedMemo ? (
         <DetailModal title="Memo Request Detail" onClose={closeDetail}>
-          <div className="space-y-6">
+          <div className="space-y-5">
             <div className="flex items-start justify-between gap-4">
               <div>
                 <p className="text-xs text-slate-400">{selectedMemo.documentNumber}</p>
-                <h3 className="mt-2 text-2xl font-semibold text-slate-900">{selectedMemo.title}</h3>
-                <p className="mt-2 text-sm text-slate-500">
+                <h3 className="mt-1.5 text-xl font-semibold text-slate-900">{selectedMemo.title}</h3>
+                <p className="mt-1.5 text-sm text-slate-500">
                   {selectedMemo.site} • {selectedMemo.department}
                 </p>
               </div>
-              <StatusBadge label={selectedMemo.status} />
+              <StatusBadge label={selectedMemo.status} className="min-h-7 min-w-0 px-2.5 text-[11px]" />
             </div>
 
             <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
               <InfoCard label="Request Date" value={selectedMemo.requestDate} />
               <InfoCard label="Required Date" value={selectedMemo.requiredDate} />
               <InfoCard label="Estimated Total" value={formatCurrency(selectedMemo.estimatedTotal)} />
-              <InfoCard label="Procurement" value={<StatusBadge label={selectedMemo.procurementStatus} />} />
+              <InfoCard label="Procurement" value={<StatusBadge label={selectedMemo.procurementStatus} className="min-h-7 min-w-0 px-2.5 text-[11px]" />} />
             </div>
 
-            <div className="rounded-[24px] border border-slate-200 bg-slate-50 p-5">
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
               <p className="font-semibold text-slate-900">Purpose</p>
-              <p className="mt-3 text-sm text-slate-600">{selectedMemo.purpose}</p>
+              <p className="mt-2 text-sm text-slate-600">{selectedMemo.purpose}</p>
             </div>
 
-            <DataTable headers={["Item", "Category", "Qty", "Amount"]} tableClassName="min-w-[720px]">
+            <DataTable
+              headers={["Item", "Category", "Qty", "Amount"]}
+              className="rounded-xl border-slate-200 shadow-none"
+              headerClassName="bg-[rgba(244,249,246,0.96)]"
+              headerCellClassName="px-4 py-3 text-xs font-semibold text-slate-500"
+              bodyClassName="[&_td]:py-3"
+              tableClassName="min-w-[720px]"
+            >
               {selectedMemo.items.map((item) => (
                 <tr key={item.id} className="border-t border-slate-100">
-                  <td className="px-5 py-4 font-medium text-slate-900">{item.name}</td>
-                  <td className="px-5 py-4">{item.category}</td>
-                  <td className="px-5 py-4">
+                  <td className="px-4 font-medium text-slate-900">{item.name}</td>
+                  <td className="px-4">{item.category}</td>
+                  <td className="px-4">
                     {item.quantity.toLocaleString()} {item.unit}
                   </td>
-                  <td className="px-5 py-4">{formatCurrency(item.quantity * item.unitPrice)}</td>
+                  <td className="px-4">{formatCurrency(item.quantity * item.unitPrice)}</td>
                 </tr>
               ))}
             </DataTable>
@@ -409,16 +568,16 @@ export function ProcureToPayPage({ initialTab = "memo" }: { initialTab?: Procure
 
       {selectedPr ? (
         <DetailModal title="PR Detail & Vendor Proposal Flow" onClose={closeDetail}>
-          <div className="space-y-6">
+          <div className="space-y-5">
             <div className="flex items-start justify-between gap-4">
               <div>
                 <p className="text-xs text-slate-400">{selectedPr.prNumber ?? selectedPr.documentNumber}</p>
-                <h3 className="mt-2 text-2xl font-semibold text-slate-900">{selectedPr.memoTitle}</h3>
-                <p className="mt-2 text-sm text-slate-500">
+                <h3 className="mt-1.5 text-xl font-semibold text-slate-900">{selectedPr.memoTitle}</h3>
+                <p className="mt-1.5 text-sm text-slate-500">
                   Requester: {memoById.get(selectedPr.memoId)?.requesterName ?? "-"}
                 </p>
               </div>
-              <StatusBadge label={selectedPr.procurementStatus} />
+              <StatusBadge label={selectedPr.procurementStatus} className="min-h-7 min-w-0 px-2.5 text-[11px]" />
             </div>
 
             <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
@@ -428,19 +587,19 @@ export function ProcureToPayPage({ initialTab = "memo" }: { initialTab?: Procure
               <InfoCard label="Selected Vendor" value={selectedPr.selectedVendorName ?? "-"} />
             </div>
 
-            <div className="rounded-[24px] border border-slate-200 bg-white shadow-sm shadow-slate-200/30">
-              <div className="border-b border-slate-200 px-5 py-4">
+            <div className="rounded-xl border border-slate-200 bg-white shadow-[0_8px_20px_rgba(15,23,42,0.04)]">
+              <div className="border-b border-slate-200 px-4 py-3">
                 <p className="font-semibold text-slate-900">Vendor Options</p>
               </div>
-              <div className="space-y-3 p-5">
+              <div className="space-y-3 p-4">
                 {selectedPr.vendorProposals.length === 0 ? (
                   <p className="text-sm text-slate-500">No vendor proposals yet.</p>
                 ) : (
                   selectedPr.vendorProposals.map((proposal) => (
-                    <div key={proposal.id} className="rounded-[20px] border border-slate-200 bg-slate-50 p-4">
+                    <div key={proposal.id} className="rounded-xl border border-slate-200 bg-slate-50 p-4">
                       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                         <div>
-                          <p className="text-lg font-semibold text-slate-900">{proposal.vendorName}</p>
+                          <p className="text-base font-semibold text-slate-900">{proposal.vendorName}</p>
                           <p className="mt-1 text-sm text-slate-500">
                             Lead time: {proposal.leadTime} • Terms: {proposal.paymentTerms}
                           </p>
@@ -452,11 +611,11 @@ export function ProcureToPayPage({ initialTab = "memo" }: { initialTab?: Procure
                             </p>
                           ) : null}
                         </div>
-                        <div className="flex flex-col items-start gap-3 lg:items-end">
-                          <p className="text-xl font-semibold text-slate-900">{formatCurrency(proposal.quotedPrice)}</p>
-                          {proposal.submittedToApprover ? <StatusBadge label="Submitted" /> : null}
+                        <div className="flex flex-col items-start gap-2.5 lg:items-end">
+                          <p className="text-lg font-semibold text-slate-900">{formatCurrency(proposal.quotedPrice)}</p>
+                          {proposal.submittedToApprover ? <StatusBadge label="Submitted" className="min-h-7 min-w-0 px-2.5 text-[11px]" /> : null}
                           {selectedPr.selectedVendorName === proposal.vendorName ? (
-                            <StatusBadge label="Vendor Approved" />
+                            <StatusBadge label="Vendor Approved" className="min-h-7 min-w-0 px-2.5 text-[11px]" />
                           ) : null}
                         </div>
                       </div>
@@ -466,9 +625,9 @@ export function ProcureToPayPage({ initialTab = "memo" }: { initialTab?: Procure
               </div>
             </div>
 
-            <div className="rounded-[24px] border border-slate-200 bg-slate-50 p-5">
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
               <p className="font-semibold text-slate-900">History</p>
-              <div className="mt-4 space-y-3">
+              <div className="mt-3 space-y-3">
                 {selectedPr.history.length === 0 ? (
                   <p className="text-sm text-slate-500">No PR history yet.</p>
                 ) : (
@@ -476,7 +635,7 @@ export function ProcureToPayPage({ initialTab = "memo" }: { initialTab?: Procure
                     .slice()
                     .reverse()
                     .map((entry, index) => (
-                      <div key={`${entry.id}-${entry.date}-${entry.action}-${entry.actorId}-${index}`} className="rounded-[20px] border border-slate-200/70 bg-white p-4">
+                      <div key={`${entry.id}-${entry.date}-${entry.action}-${entry.actorId}-${index}`} className="rounded-xl border border-slate-200/80 bg-white p-4">
                         <div className="flex items-center justify-between gap-3">
                           <p className="font-semibold text-slate-900">{entry.action}</p>
                           <span className="text-xs text-slate-400">{entry.date.slice(0, 10)}</span>
@@ -496,16 +655,16 @@ export function ProcureToPayPage({ initialTab = "memo" }: { initialTab?: Procure
 
       {selectedPo ? (
         <DetailModal title="PO Detail" onClose={closeDetail}>
-          <div className="space-y-6">
+          <div className="space-y-5">
             <div className="flex items-start justify-between gap-4">
               <div>
                 <p className="text-xs text-slate-400">{selectedPo.poNumber ?? selectedPo.documentNumber}</p>
-                <h3 className="mt-2 text-2xl font-semibold text-slate-900">{selectedPo.memoTitle}</h3>
-                <p className="mt-2 text-sm text-slate-500">
+                <h3 className="mt-1.5 text-xl font-semibold text-slate-900">{selectedPo.memoTitle}</h3>
+                <p className="mt-1.5 text-sm text-slate-500">
                   Vendor: {selectedPo.selectedVendorName ?? selectedPo.vendorName}
                 </p>
               </div>
-              <StatusBadge label={selectedPo.procurementStatus} />
+              <StatusBadge label={selectedPo.procurementStatus} className="min-h-7 min-w-0 px-2.5 text-[11px]" />
             </div>
 
             <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
@@ -515,16 +674,16 @@ export function ProcureToPayPage({ initialTab = "memo" }: { initialTab?: Procure
               <InfoCard label="Vendor" value={selectedPo.selectedVendorName ?? selectedPo.vendorName} />
             </div>
 
-            <div className="rounded-[24px] border border-slate-200 bg-slate-50 p-5">
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
               <p className="font-semibold text-slate-900">PO Status Flow</p>
-              <div className="mt-4 flex flex-wrap gap-2">
+              <div className="mt-3 flex flex-wrap gap-2">
                 {["PO Created", "Sent to Vendor", "Pending Receiving", "Received", "QC Passed"].map((status) => (
                   <span
                     key={status}
-                    className={`rounded-full px-3 py-2 text-sm font-medium ${
+                    className={`rounded-full px-3 py-1.5 text-xs font-semibold ${
                       selectedPo.procurementStatus === status
                         ? "bg-[#007946] text-white"
-                        : "border border-slate-200 bg-white text-slate-500 shadow-sm"
+                        : "border border-slate-200 bg-white text-slate-500"
                     }`}
                   >
                     {status}

@@ -228,6 +228,7 @@ export interface POApprovalRequest {
 export interface CurrentStoreState {
   currentRole: Role;
   currentUserId: string;
+  currentUsername: string | null;
   isAuthenticated: boolean;
 }
 
@@ -242,7 +243,8 @@ export interface ProcurementState extends CurrentStoreState {
   approvalHistory: ApprovalHistory[];
   receivingRecords: ReceivingRecord[];
   paymentRequests: PaymentRequest[];
-  loginAsRole: (role: Extract<Role, "Requester" | "Approver" | "Purchasing">) => void;
+  login: (username: string, password: string) => { success: true } | { success: false; error: string };
+  loginAsRole: (role: Extract<Role, "Requester" | "Approver" | "Purchasing" | "Finance">) => void;
   logout: () => void;
   switchRole: (role: Role) => void;
   createMemo: (memo: Omit<MemoRequest, "id" | "documentNumber" | "createdAt" | "updatedAt" | "history" | "procurementStatus" | "status" | "assignedApproverId" | "currentApproverName" | "estimatedTotal">) => Promise<string>;

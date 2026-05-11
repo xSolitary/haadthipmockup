@@ -1,7 +1,7 @@
 "use client";
 
-import { ReactNode, useEffect } from "react";
-import { AuthGate } from "@/components/layout/AuthGate";
+import { ReactNode, useEffect, useState } from "react";
+import { usePathname, useRouter } from "next/navigation";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { Topbar } from "@/components/layout/Topbar";
 import { useProcurementStore } from "@/store/useProcurementStore";
@@ -11,29 +11,64 @@ interface AppShellProps {
 }
 
 export function AppShell({ children }: AppShellProps) {
+  const pathname = usePathname();
+  const router = useRouter();
+  const [hasHydrated, setHasHydrated] = useState(() => useProcurementStore.persist.hasHydrated());
   const isAuthenticated = useProcurementStore((state) => state.isAuthenticated);
   const initializeData = useProcurementStore((state) => state.initializeData);
+  const isLoginRoute = pathname === "/login";
 
   useEffect(() => {
-    if (!isAuthenticated) {
+    const unsubscribe = useProcurementStore.persist.onFinishHydration(() => {
+      setHasHydrated(true);
+    });
+
+    return unsubscribe;
+  }, []);
+
+  useEffect(() => {
+    if (!hasHydrated) {
+      return;
+    }
+
+    if (!isAuthenticated && !isLoginRoute) {
+      router.replace("/login");
+      return;
+    }
+
+    if (isAuthenticated && isLoginRoute) {
+      router.replace("/");
+    }
+  }, [hasHydrated, isAuthenticated, isLoginRoute, router]);
+
+  useEffect(() => {
+    if (!hasHydrated || !isAuthenticated) {
       return;
     }
 
     void initializeData();
-  }, [initializeData, isAuthenticated]);
+  }, [hasHydrated, initializeData, isAuthenticated]);
+
+  if (!hasHydrated) {
+    return <div className="min-h-screen bg-[var(--background)]" />;
+  }
 
   if (!isAuthenticated) {
-    return <AuthGate />;
+    return isLoginRoute ? <>{children}</> : <div className="min-h-screen bg-[var(--background)]" />;
+  }
+
+  if (isLoginRoute) {
+    return <div className="min-h-screen bg-[var(--background)]" />;
   }
 
   return (
-    <div className="min-h-screen bg-[#f6f8fa] text-slate-900">
+    <div className="min-h-screen bg-[var(--background)] text-slate-900">
       <div className="flex min-h-screen">
         <Sidebar />
         <div className="flex min-h-screen flex-1 flex-col">
           <Topbar />
-          <main className="flex-1 px-4 py-5 sm:px-6 lg:px-8 xl:px-10">
-            <div className="mx-auto w-full max-w-[1480px] pb-10">{children}</div>
+          <main className="flex-1 px-4 py-5 sm:px-6 lg:px-7 xl:px-8">
+            <div className="mx-auto w-full max-w-[1520px] pb-10">{children}</div>
           </main>
         </div>
       </div>
