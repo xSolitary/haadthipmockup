@@ -1,4 +1,5 @@
 import { ReactNode } from "react";
+import { getStatusLabel } from "@/lib/ui-text";
 
 const statusStyles: Record<string, string> = {
   Draft: "border-slate-200 bg-slate-100 text-slate-700",
@@ -40,7 +41,7 @@ export function StatusBadge({ label, icon, className = "" }: StatusBadgeProps) {
   return (
     <span className={`inline-flex min-h-8 min-w-24 items-center justify-center rounded-full border px-3 py-1 text-center text-xs font-semibold tracking-normal shadow-sm ${statusStyles[label] ?? "border-slate-200 bg-slate-100 text-slate-800"} ${className}`}>
       {icon ? <span className="mr-2">{icon}</span> : null}
-      {label}
+      {getStatusLabel(label)}
     </span>
   );
 }

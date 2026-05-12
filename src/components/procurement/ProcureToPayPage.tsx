@@ -1,13 +1,15 @@
 "use client";
 
 import Link from "next/link";
+import type { ReactNode } from "react";
 import { useMemo, useState } from "react";
 import { Download, Eye, Pencil, Plus, Search, X } from "lucide-react";
-import { PageHeader } from "@/components/ui/PageHeader";
 import { DataTable } from "@/components/ui/DataTable";
+import { PageHeader } from "@/components/ui/PageHeader";
 import { StatusBadge } from "@/components/ui/StatusBadge";
-import { useProcurementStore } from "@/store/useProcurementStore";
 import type { MemoRequest, PurchaseOrder } from "@/lib/types";
+import { getCategoryLabel, getStatusLabel } from "@/lib/ui-text";
+import { useProcurementStore } from "@/store/useProcurementStore";
 
 type ProcureTab = "memo" | "pr" | "po";
 type DetailState =
@@ -62,7 +64,7 @@ function SummaryTabCard({
             {pendingCount}
           </span>
         </div>
-        <p className="mt-2 text-xs text-slate-500">{count} items</p>
+        <p className="mt-2 text-xs text-slate-500">{count} รายการ</p>
       </div>
       <div className={`mt-0.5 h-8 w-8 rounded-lg border ${active ? "border-[#cce5d7] bg-[#f3fbf7]" : "border-slate-200 bg-slate-50"}`} />
     </button>
@@ -76,7 +78,7 @@ function DetailModal({
 }: {
   title: string;
   onClose: () => void;
-  children: React.ReactNode;
+  children: ReactNode;
 }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/32 p-4 backdrop-blur-sm">
@@ -97,7 +99,7 @@ function DetailModal({
   );
 }
 
-function InfoCard({ label, value }: { label: string; value: React.ReactNode }) {
+function InfoCard({ label, value }: { label: string; value: ReactNode }) {
   return (
     <div className="rounded-xl border border-slate-200 bg-slate-50/80 p-4">
       <p className="text-xs text-slate-500">{label}</p>
@@ -106,10 +108,11 @@ function InfoCard({ label, value }: { label: string; value: React.ReactNode }) {
   );
 }
 
-function ActionIconLink({ href, icon }: { href: string; icon: React.ReactNode }) {
+function ActionIconLink({ href, icon, title }: { href: string; icon: ReactNode; title: string }) {
   return (
     <Link
       href={href}
+      title={title}
       className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 transition hover:border-[#007946]/25 hover:bg-[#f4fbf7] hover:text-[#007946]"
     >
       {icon}
@@ -117,11 +120,12 @@ function ActionIconLink({ href, icon }: { href: string; icon: React.ReactNode })
   );
 }
 
-function ActionIconButton({ onClick, icon }: { onClick: () => void; icon: React.ReactNode }) {
+function ActionIconButton({ onClick, icon, title }: { onClick: () => void; icon: ReactNode; title: string }) {
   return (
     <button
       type="button"
       onClick={onClick}
+      title={title}
       className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 transition hover:border-[#007946]/25 hover:bg-[#f4fbf7] hover:text-[#007946]"
     >
       {icon}
@@ -255,7 +259,7 @@ export function ProcureToPayPage({ initialTab = "memo" }: { initialTab?: Procure
   );
 
   const tabMeta = [
-    { id: "memo" as const, label: "Memo Request", count: memoRequests.length, pendingCount: memoPendingCount },
+    { id: "memo" as const, label: "Memo", count: memoRequests.length, pendingCount: memoPendingCount },
     { id: "pr" as const, label: "PR", count: prItems.length, pendingCount: prPendingCount },
     { id: "po" as const, label: "PO", count: poItems.length, pendingCount: poPendingCount },
   ];
@@ -343,7 +347,7 @@ export function ProcureToPayPage({ initialTab = "memo" }: { initialTab?: Procure
     <div className="space-y-4">
       <PageHeader
         title="Procure-to-Pay"
-        subtitle="รวม Memo Request, PR และ PO ของทุกขั้นตอนในกระบวนการจัดซื้อ"
+        subtitle="รวม Memo, PR และ PO ในกระบวนการจัดซื้อ"
         className="rounded-xl px-5 py-5 shadow-[0_10px_24px_rgba(15,23,42,0.05)]"
         contentClassName="gap-3"
       />
@@ -369,7 +373,7 @@ export function ProcureToPayPage({ initialTab = "memo" }: { initialTab?: Procure
               <input
                 value={searchTerm}
                 onChange={(event) => setSearchTerm(event.target.value)}
-                placeholder={`Search ${currentTab.toUpperCase()}...`}
+                placeholder={`ค้นหา ${currentTab.toUpperCase()}...`}
                 className="h-10 w-full rounded-xl border border-slate-200 bg-white pl-9 pr-3 text-sm text-slate-900 placeholder:text-slate-400"
               />
             </label>
@@ -379,10 +383,10 @@ export function ProcureToPayPage({ initialTab = "memo" }: { initialTab?: Procure
               onChange={(event) => setStatusFilter(event.target.value)}
               className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-700 lg:w-56"
             >
-              <option value="all">All statuses</option>
+              <option value="all">ทุก Status</option>
               {statusOptions.map((status) => (
                 <option key={status} value={status}>
-                  {status}
+                  {getStatusLabel(status)}
                 </option>
               ))}
             </select>
@@ -402,7 +406,7 @@ export function ProcureToPayPage({ initialTab = "memo" }: { initialTab?: Procure
           {currentTab === "memo" ? (
             !hasBaseItems ? (
               <p className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-4 py-8 text-center text-sm text-slate-500">
-                ยังไม่มี memo ที่ต้องจัดการสำหรับบทบาทนี้
+                ยังไม่มี Memo ที่ต้องดำเนินการสำหรับ Role นี้
               </p>
             ) : filteredMemoRequests.length === 0 ? (
               <p className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-4 py-8 text-center text-sm text-slate-500">
@@ -410,7 +414,7 @@ export function ProcureToPayPage({ initialTab = "memo" }: { initialTab?: Procure
               </p>
             ) : (
               <DataTable
-                headers={["เลขที่", "หัวข้อ", "ไซต์", "ยอด", "สถานะ", ""]}
+                headers={["เลขที่", "หัวข้อ", "ไซต์", "ยอดเงิน", "Status", ""]}
                 className="rounded-xl border-slate-200 shadow-none"
                 headerClassName="bg-[rgba(244,249,246,0.96)]"
                 headerCellClassName="px-4 py-3 text-xs font-semibold text-slate-500"
@@ -428,8 +432,8 @@ export function ProcureToPayPage({ initialTab = "memo" }: { initialTab?: Procure
                     </td>
                     <td className="px-4 text-right">
                       <div className="flex justify-end gap-2">
-                        {getMemoActionHref(memo.id) ? <ActionIconLink href={getMemoActionHref(memo.id) ?? "#"} icon={<Pencil className="h-4 w-4" />} /> : null}
-                        <ActionIconButton onClick={() => openDetail("memo", memo.id)} icon={<Eye className="h-4 w-4" />} />
+                        {getMemoActionHref(memo.id) ? <ActionIconLink href={getMemoActionHref(memo.id) ?? "#"} icon={<Pencil className="h-4 w-4" />} title="แก้ไข" /> : null}
+                        <ActionIconButton onClick={() => openDetail("memo", memo.id)} icon={<Eye className="h-4 w-4" />} title="ดูรายละเอียด" />
                       </div>
                     </td>
                   </tr>
@@ -441,7 +445,7 @@ export function ProcureToPayPage({ initialTab = "memo" }: { initialTab?: Procure
           {currentTab === "pr" ? (
             !hasBaseItems ? (
               <p className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-4 py-8 text-center text-sm text-slate-500">
-                ยังไม่มี PR สำหรับบทบาทนี้
+                ยังไม่มี PR สำหรับ Role นี้
               </p>
             ) : filteredPrItems.length === 0 ? (
               <p className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-4 py-8 text-center text-sm text-slate-500">
@@ -449,7 +453,7 @@ export function ProcureToPayPage({ initialTab = "memo" }: { initialTab?: Procure
               </p>
             ) : (
               <DataTable
-                headers={["PR", "หัวข้อ", "Vendor Options", "Selected Vendor", "สถานะ", ""]}
+                headers={["PR", "หัวข้อ", "ตัวเลือก Vendor", "Vendor ที่เลือก", "Status", ""]}
                 className="rounded-xl border-slate-200 shadow-none"
                 headerClassName="bg-[rgba(244,249,246,0.96)]"
                 headerCellClassName="px-4 py-3 text-xs font-semibold text-slate-500"
@@ -467,8 +471,8 @@ export function ProcureToPayPage({ initialTab = "memo" }: { initialTab?: Procure
                     </td>
                     <td className="px-4 text-right">
                       <div className="flex justify-end gap-2">
-                        {getPrActionHref(po.id) ? <ActionIconLink href={getPrActionHref(po.id) ?? "#"} icon={<Pencil className="h-4 w-4" />} /> : null}
-                        <ActionIconButton onClick={() => openDetail("pr", po.id)} icon={<Eye className="h-4 w-4" />} />
+                        {getPrActionHref(po.id) ? <ActionIconLink href={getPrActionHref(po.id) ?? "#"} icon={<Pencil className="h-4 w-4" />} title="แก้ไข" /> : null}
+                        <ActionIconButton onClick={() => openDetail("pr", po.id)} icon={<Eye className="h-4 w-4" />} title="ดูรายละเอียด" />
                       </div>
                     </td>
                   </tr>
@@ -488,7 +492,7 @@ export function ProcureToPayPage({ initialTab = "memo" }: { initialTab?: Procure
               </p>
             ) : (
               <DataTable
-                headers={["PO", "หัวข้อ", "Vendor", "ยอด", "สถานะ", ""]}
+                headers={["PO", "หัวข้อ", "Vendor", "ยอดเงิน", "Status", ""]}
                 className="rounded-xl border-slate-200 shadow-none"
                 headerClassName="bg-[rgba(244,249,246,0.96)]"
                 headerCellClassName="px-4 py-3 text-xs font-semibold text-slate-500"
@@ -506,7 +510,7 @@ export function ProcureToPayPage({ initialTab = "memo" }: { initialTab?: Procure
                     </td>
                     <td className="px-4 text-right">
                       <div className="flex justify-end gap-2">
-                        <ActionIconButton onClick={() => openDetail("po", po.id)} icon={<Eye className="h-4 w-4" />} />
+                        <ActionIconButton onClick={() => openDetail("po", po.id)} icon={<Eye className="h-4 w-4" />} title="ดูรายละเอียด" />
                       </div>
                     </td>
                   </tr>
@@ -518,7 +522,7 @@ export function ProcureToPayPage({ initialTab = "memo" }: { initialTab?: Procure
       </section>
 
       {selectedMemo ? (
-        <DetailModal title="Memo Request Detail" onClose={closeDetail}>
+        <DetailModal title="รายละเอียด Memo" onClose={closeDetail}>
           <div className="space-y-5">
             <div className="flex items-start justify-between gap-4">
               <div>
@@ -532,19 +536,19 @@ export function ProcureToPayPage({ initialTab = "memo" }: { initialTab?: Procure
             </div>
 
             <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-              <InfoCard label="Request Date" value={selectedMemo.requestDate} />
-              <InfoCard label="Required Date" value={selectedMemo.requiredDate} />
-              <InfoCard label="Estimated Total" value={formatCurrency(selectedMemo.estimatedTotal)} />
-              <InfoCard label="Procurement" value={<StatusBadge label={selectedMemo.procurementStatus} className="min-h-7 min-w-0 px-2.5 text-[11px]" />} />
+              <InfoCard label="วันที่ขอ" value={selectedMemo.requestDate} />
+              <InfoCard label="วันที่ต้องการใช้" value={selectedMemo.requiredDate} />
+              <InfoCard label="มูลค่าประมาณการ" value={formatCurrency(selectedMemo.estimatedTotal)} />
+              <InfoCard label="สถานะจัดซื้อ" value={<StatusBadge label={selectedMemo.procurementStatus} className="min-h-7 min-w-0 px-2.5 text-[11px]" />} />
             </div>
 
             <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-              <p className="font-semibold text-slate-900">Purpose</p>
+              <p className="font-semibold text-slate-900">วัตถุประสงค์</p>
               <p className="mt-2 text-sm text-slate-600">{selectedMemo.purpose}</p>
             </div>
 
             <DataTable
-              headers={["Item", "Category", "Qty", "Amount"]}
+              headers={["รายการ", "หมวด", "จำนวน", "มูลค่า"]}
               className="rounded-xl border-slate-200 shadow-none"
               headerClassName="bg-[rgba(244,249,246,0.96)]"
               headerCellClassName="px-4 py-3 text-xs font-semibold text-slate-500"
@@ -554,7 +558,7 @@ export function ProcureToPayPage({ initialTab = "memo" }: { initialTab?: Procure
               {selectedMemo.items.map((item) => (
                 <tr key={item.id} className="border-t border-slate-100">
                   <td className="px-4 font-medium text-slate-900">{item.name}</td>
-                  <td className="px-4">{item.category}</td>
+                  <td className="px-4">{getCategoryLabel(item.category)}</td>
                   <td className="px-4">
                     {item.quantity.toLocaleString()} {item.unit}
                   </td>
@@ -567,33 +571,33 @@ export function ProcureToPayPage({ initialTab = "memo" }: { initialTab?: Procure
       ) : null}
 
       {selectedPr ? (
-        <DetailModal title="PR Detail & Vendor Proposal Flow" onClose={closeDetail}>
+        <DetailModal title="รายละเอียด PR และการเสนอ Vendor" onClose={closeDetail}>
           <div className="space-y-5">
             <div className="flex items-start justify-between gap-4">
               <div>
                 <p className="text-xs text-slate-400">{selectedPr.prNumber ?? selectedPr.documentNumber}</p>
                 <h3 className="mt-1.5 text-xl font-semibold text-slate-900">{selectedPr.memoTitle}</h3>
                 <p className="mt-1.5 text-sm text-slate-500">
-                  Requester: {memoById.get(selectedPr.memoId)?.requesterName ?? "-"}
+                  ผู้ขอซื้อ: {memoById.get(selectedPr.memoId)?.requesterName ?? "-"}
                 </p>
               </div>
               <StatusBadge label={selectedPr.procurementStatus} className="min-h-7 min-w-0 px-2.5 text-[11px]" />
             </div>
 
             <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-              <InfoCard label="PR Number" value={selectedPr.prNumber ?? selectedPr.documentNumber} />
-              <InfoCard label="PO Number" value={selectedPr.poNumber ?? "-"} />
-              <InfoCard label="Current Value" value={formatCurrency(selectedPr.amount)} />
-              <InfoCard label="Selected Vendor" value={selectedPr.selectedVendorName ?? "-"} />
+              <InfoCard label="เลขที่ PR" value={selectedPr.prNumber ?? selectedPr.documentNumber} />
+              <InfoCard label="เลขที่ PO" value={selectedPr.poNumber ?? "-"} />
+              <InfoCard label="มูลค่าปัจจุบัน" value={formatCurrency(selectedPr.amount)} />
+              <InfoCard label="Vendor ที่เลือก" value={selectedPr.selectedVendorName ?? "-"} />
             </div>
 
             <div className="rounded-xl border border-slate-200 bg-white shadow-[0_8px_20px_rgba(15,23,42,0.04)]">
               <div className="border-b border-slate-200 px-4 py-3">
-                <p className="font-semibold text-slate-900">Vendor Options</p>
+                <p className="font-semibold text-slate-900">ตัวเลือก Vendor</p>
               </div>
               <div className="space-y-3 p-4">
                 {selectedPr.vendorProposals.length === 0 ? (
-                  <p className="text-sm text-slate-500">No vendor proposals yet.</p>
+                  <p className="text-sm text-slate-500">ยังไม่มีการเสนอ Vendor</p>
                 ) : (
                   selectedPr.vendorProposals.map((proposal) => (
                     <div key={proposal.id} className="rounded-xl border border-slate-200 bg-slate-50 p-4">
@@ -601,12 +605,12 @@ export function ProcureToPayPage({ initialTab = "memo" }: { initialTab?: Procure
                         <div>
                           <p className="text-base font-semibold text-slate-900">{proposal.vendorName}</p>
                           <p className="mt-1 text-sm text-slate-500">
-                            Lead time: {proposal.leadTime} • Terms: {proposal.paymentTerms}
+                            Lead time: {proposal.leadTime} • Payment terms: {proposal.paymentTerms}
                           </p>
                           <p className="mt-2 text-sm text-slate-600">{proposal.notes}</p>
                           {proposal.attachmentName ? (
                             <p className="mt-2 text-sm text-sky-700">
-                              Attachment: {proposal.attachmentName}
+                              เอกสารแนบ: {proposal.attachmentName}
                               {proposal.attachmentUrl ? ` (${proposal.attachmentUrl})` : ""}
                             </p>
                           ) : null}
@@ -626,10 +630,10 @@ export function ProcureToPayPage({ initialTab = "memo" }: { initialTab?: Procure
             </div>
 
             <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-              <p className="font-semibold text-slate-900">History</p>
+              <p className="font-semibold text-slate-900">ประวัติรายการ</p>
               <div className="mt-3 space-y-3">
                 {selectedPr.history.length === 0 ? (
-                  <p className="text-sm text-slate-500">No PR history yet.</p>
+                  <p className="text-sm text-slate-500">ยังไม่มีประวัติ PR</p>
                 ) : (
                   selectedPr.history
                     .slice()
@@ -637,7 +641,7 @@ export function ProcureToPayPage({ initialTab = "memo" }: { initialTab?: Procure
                     .map((entry, index) => (
                       <div key={`${entry.id}-${entry.date}-${entry.action}-${entry.actorId}-${index}`} className="rounded-xl border border-slate-200/80 bg-white p-4">
                         <div className="flex items-center justify-between gap-3">
-                          <p className="font-semibold text-slate-900">{entry.action}</p>
+                          <p className="font-semibold text-slate-900">{entry.actionLabelTh}</p>
                           <span className="text-xs text-slate-400">{entry.date.slice(0, 10)}</span>
                         </div>
                         <p className="mt-2 text-sm text-slate-600">{entry.comment}</p>
@@ -654,7 +658,7 @@ export function ProcureToPayPage({ initialTab = "memo" }: { initialTab?: Procure
       ) : null}
 
       {selectedPo ? (
-        <DetailModal title="PO Detail" onClose={closeDetail}>
+        <DetailModal title="รายละเอียด PO" onClose={closeDetail}>
           <div className="space-y-5">
             <div className="flex items-start justify-between gap-4">
               <div>
@@ -668,14 +672,14 @@ export function ProcureToPayPage({ initialTab = "memo" }: { initialTab?: Procure
             </div>
 
             <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-              <InfoCard label="PO Number" value={selectedPo.poNumber ?? "-"} />
-              <InfoCard label="PR Number" value={selectedPo.prNumber ?? selectedPo.documentNumber} />
-              <InfoCard label="Amount" value={formatCurrency(selectedPo.amount)} />
+              <InfoCard label="เลขที่ PO" value={selectedPo.poNumber ?? "-"} />
+              <InfoCard label="เลขที่ PR" value={selectedPo.prNumber ?? selectedPo.documentNumber} />
+              <InfoCard label="มูลค่า" value={formatCurrency(selectedPo.amount)} />
               <InfoCard label="Vendor" value={selectedPo.selectedVendorName ?? selectedPo.vendorName} />
             </div>
 
             <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-              <p className="font-semibold text-slate-900">PO Status Flow</p>
+              <p className="font-semibold text-slate-900">ลำดับสถานะ PO</p>
               <div className="mt-3 flex flex-wrap gap-2">
                 {["PO Created", "Sent to Vendor", "Pending Receiving", "Received", "QC Passed"].map((status) => (
                   <span
@@ -686,7 +690,7 @@ export function ProcureToPayPage({ initialTab = "memo" }: { initialTab?: Procure
                         : "border border-slate-200 bg-white text-slate-500"
                     }`}
                   >
-                    {status}
+                    {getStatusLabel(status)}
                   </span>
                 ))}
               </div>
@@ -698,7 +702,7 @@ export function ProcureToPayPage({ initialTab = "memo" }: { initialTab?: Procure
                 onClick={() => alert(`ดาวน์โหลด PO สำเร็จ (Mock)\nDocument: ${selectedPo.poNumber ?? selectedPo.documentNumber}`)}
                 className="inline-flex h-10 items-center gap-2 rounded-xl bg-slate-800 px-4 text-sm font-semibold text-white transition hover:bg-slate-900"
               >
-                <Download className="h-4 w-4" /> Download PO
+                <Download className="h-4 w-4" /> ดาวน์โหลด PO
               </button>
             </div>
           </div>

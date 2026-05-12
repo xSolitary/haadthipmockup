@@ -14,7 +14,7 @@ export function PageHeader({ title, subtitle, actions, className = "", contentCl
       <div className={`flex flex-col gap-4 md:flex-row md:items-end md:justify-between ${contentClassName}`}>
         <div className="max-w-3xl">
           <p className="inline-flex rounded-full bg-[var(--surface-tint)] px-3 py-1 text-xs font-semibold tracking-[0.12em] text-[var(--primary-ink)]">
-            Workspace
+            ระบบงาน
           </p>
           <h1 className="mt-3 text-3xl font-semibold text-slate-900 md:text-[2rem]">{title}</h1>
           {subtitle ? <p className="mt-2 text-sm leading-6 text-slate-500">{subtitle}</p> : null}

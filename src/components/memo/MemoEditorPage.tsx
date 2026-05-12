@@ -3,11 +3,12 @@
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Plus, Trash2 } from "lucide-react";
-import { PageHeader } from "@/components/ui/PageHeader";
 import { FormSection } from "@/components/ui/FormSection";
+import { PageHeader } from "@/components/ui/PageHeader";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { departments, sites } from "@/lib/mock-data";
 import type { MemoRequest, ProcurementCategory } from "@/lib/types";
+import { getCategoryLabel, getUrgencyLabel } from "@/lib/ui-text";
 import { useProcurementStore } from "@/store/useProcurementStore";
 
 const categories: ProcurementCategory[] = [
@@ -28,9 +29,9 @@ const formatCurrency = (value: number) =>
 
 function getDefaultMemoValues() {
   return {
-    title: "ขวด PET และฉลากสินค้าใหม่สำหรับไลน์ผลิต",
+    title: "ขวด PET และฉลากสินค้าสำหรับไลน์ผลิตใหม่",
     category: "Packaging" as ProcurementCategory,
-    purpose: "รองรับการบรรจุเครื่องดื่มสูตรใหม่และสต็อกฉลากสินค้า",
+    purpose: "รองรับการบรรจุเครื่องดื่มสูตรใหม่และเตรียมสต็อกฉลากสินค้า",
     urgency: "Normal" as (typeof urgencyOptions)[number],
     budgetCode: "BUD-3308",
     deliveryLocation: "โรงงานหาดใหญ่",
@@ -143,7 +144,7 @@ export function MemoEditorPage({ memoId }: { memoId?: string }) {
     attachments: editingMemo?.attachments ?? ["ใบเสนอราคา.pdf", "ภาพตัวอย่างสินค้า.png"],
     budgetRemaining: editingMemo?.budgetRemaining ?? 380000,
     requesterId: currentUserId,
-    requesterName: currentUser?.name ?? "ผู้ขอ",
+    requesterName: currentUser?.name ?? "ผู้ขอซื้อ",
   };
 
   const handleSaveDraft = async () => {
@@ -187,15 +188,15 @@ export function MemoEditorPage({ memoId }: { memoId?: string }) {
   if (isEditing && (!editingMemo || !canEdit)) {
     return (
       <div className="space-y-6">
-        <PageHeader title="Edit Memo" subtitle="ไม่สามารถแก้ไข Memo รายการนี้ได้" />
+        <PageHeader title="แก้ไข Memo" subtitle="ไม่สามารถแก้ไข Memo รายการนี้ได้" />
         <div className="rounded-[24px] border border-slate-200 bg-white p-6 shadow-sm shadow-slate-200/50">
-          <p className="text-sm text-slate-600">Memo นี้ต้องเป็น Draft หรือ Revision Required และเป็นของผู้ขอคนปัจจุบันเท่านั้น</p>
+          <p className="text-sm text-slate-600">Memo นี้ต้องอยู่ในสถานะ Draft หรือ Revision Required และเป็นรายการของผู้ขอซื้อปัจจุบันเท่านั้น</p>
           <button
             type="button"
             onClick={() => router.push("/my-requests")}
             className="mt-4 inline-flex h-10 items-center rounded-xl bg-[#007946] px-4 text-sm font-semibold text-white transition hover:bg-[#005f37]"
           >
-            กลับไป Procure-to-Pay
+            กลับไปหน้า Procure-to-Pay
           </button>
         </div>
       </div>
@@ -208,15 +209,15 @@ export function MemoEditorPage({ memoId }: { memoId?: string }) {
   return (
     <div className="space-y-6">
       <PageHeader
-        title={isEditing ? (isRevision ? "แก้ไข Memo เพื่อส่งใหม่" : "แก้ไข Memo Draft") : "สร้าง Memo ขอซื้อ"}
-        subtitle={isEditing ? "ปรับปรุงข้อมูลเดิมในรูปแบบฟอร์มเต็มหน้า โดยยังคง flow เดิมของระบบ" : "แบบฟอร์มคำขอจัดซื้อสำหรับฝ่ายองค์กร"}
+        title={isEditing ? (isRevision ? "แก้ไข Memo เพื่อส่งใหม่" : "แก้ไข Memo Draft") : "Create Memo"}
+        subtitle={isEditing ? "ปรับปรุงข้อมูลคำขอเดิมโดยคง Workflow เดิมของระบบ" : "สร้างคำขอจัดซื้อใหม่"}
       />
       <div className="grid gap-6 xl:grid-cols-[2fr_1fr]">
         <div className="space-y-6">
-          <FormSection title="ข้อมูลผู้ขอ" description="ตรวจสอบและกรอกข้อมูลของผู้ขอให้ครบถ้วน">
+          <FormSection title="ข้อมูลผู้ขอซื้อ" description="ตรวจสอบและกรอกข้อมูลผู้ขอซื้อให้ครบถ้วน">
             <div className="grid gap-4 md:grid-cols-2">
               <label className="space-y-2 text-sm text-slate-700">
-                ชื่อผู้ขอ
+                ชื่อผู้ขอซื้อ
                 <input type="text" value={currentUser?.name ?? ""} readOnly className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 text-sm text-slate-900" />
               </label>
               <label className="space-y-2 text-sm text-slate-700">
@@ -244,7 +245,7 @@ export function MemoEditorPage({ memoId }: { memoId?: string }) {
                 <input type="date" value={editingMemo?.requestDate ?? new Date().toISOString().slice(0, 10)} readOnly className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 text-sm text-slate-900" />
               </label>
               <label className="space-y-2 text-sm text-slate-700">
-                วันที่ต้องการ
+                วันที่ต้องการใช้
                 <input type="date" value={requiredDate} onChange={(event) => setRequiredDate(event.target.value)} className="h-11 w-full rounded-xl border border-slate-200 bg-white px-4 text-sm text-slate-900" />
               </label>
             </div>
@@ -258,10 +259,10 @@ export function MemoEditorPage({ memoId }: { memoId?: string }) {
               </label>
               <div className="grid gap-4 md:grid-cols-2">
                 <label className="space-y-2 text-sm text-slate-700">
-                  หมวดการจัดซื้อ
+                  หมวดจัดซื้อ
                   <select value={category} onChange={(event) => setCategory(event.target.value as ProcurementCategory)} className="h-11 w-full rounded-xl border border-slate-200 bg-white px-4 text-sm text-slate-900">
                     {categories.map((option) => (
-                      <option key={option} value={option}>{option}</option>
+                      <option key={option} value={option}>{getCategoryLabel(option)}</option>
                     ))}
                   </select>
                 </label>
@@ -269,18 +270,18 @@ export function MemoEditorPage({ memoId }: { memoId?: string }) {
                   ความเร่งด่วน
                   <select value={urgency} onChange={(event) => setUrgency(event.target.value as (typeof urgencyOptions)[number])} className="h-11 w-full rounded-xl border border-slate-200 bg-white px-4 text-sm text-slate-900">
                     {urgencyOptions.map((option) => (
-                      <option key={option} value={option}>{option}</option>
+                      <option key={option} value={option}>{getUrgencyLabel(option)}</option>
                     ))}
                   </select>
                 </label>
               </div>
               <label className="space-y-2 text-sm text-slate-700">
                 วัตถุประสงค์ / เหตุผล
-                <textarea value={purpose} onChange={(event) => setPurpose(event.target.value)} rows={4} className="w-full rounded-[20px] border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900"></textarea>
+                <textarea value={purpose} onChange={(event) => setPurpose(event.target.value)} rows={4} className="w-full rounded-[20px] border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900" />
               </label>
               <div className="grid gap-4 md:grid-cols-2">
                 <label className="space-y-2 text-sm text-slate-700">
-                  รหัสงบประมาณ
+                  รหัส Budget
                   <input value={budgetCode} onChange={(event) => setBudgetCode(event.target.value)} className="h-11 w-full rounded-xl border border-slate-200 bg-white px-4 text-sm text-slate-900" />
                 </label>
                 <label className="space-y-2 text-sm text-slate-700">
@@ -291,13 +292,13 @@ export function MemoEditorPage({ memoId }: { memoId?: string }) {
             </div>
           </FormSection>
 
-          <FormSection title="รายการสินค้า / บริการ" description="เพิ่มสินค้าและประมาณราคาเพื่อประกอบคำขอ">
+          <FormSection title="รายการสินค้า / บริการ" description="เพิ่มรายการและประมาณการราคาเพื่อประกอบคำขอ">
             <div className="space-y-4">
               {items.map((item) => (
                 <div key={item.id} className="rounded-[20px] border border-slate-200 bg-slate-50 p-4">
                   <div className="grid gap-4 md:grid-cols-[2fr_1fr_1fr]">
                     <label className="space-y-2 text-sm text-slate-700">
-                      ชื่อสินค้า
+                      ชื่อรายการ
                       <input value={item.name} onChange={(event) => handleItemChange(item.id, "name", event.target.value)} className="h-11 w-full rounded-xl border border-slate-200 bg-white px-4 text-sm text-slate-900" />
                     </label>
                     <label className="space-y-2 text-sm text-slate-700">
@@ -305,7 +306,7 @@ export function MemoEditorPage({ memoId }: { memoId?: string }) {
                       <input type="number" min={1} value={item.quantity} onChange={(event) => handleItemChange(item.id, "quantity", Number(event.target.value))} className="h-11 w-full rounded-xl border border-slate-200 bg-white px-4 text-sm text-slate-900" />
                     </label>
                     <label className="space-y-2 text-sm text-slate-700">
-                      ราคา/หน่วย
+                      ราคา / หน่วย
                       <input type="number" min={0} value={item.unitPrice} onChange={(event) => handleItemChange(item.id, "unitPrice", Number(event.target.value))} className="h-11 w-full rounded-xl border border-slate-200 bg-white px-4 text-sm text-slate-900" />
                     </label>
                   </div>
@@ -315,10 +316,10 @@ export function MemoEditorPage({ memoId }: { memoId?: string }) {
                       <input value={item.unit} onChange={(event) => handleItemChange(item.id, "unit", event.target.value)} className="h-11 w-full rounded-xl border border-slate-200 bg-white px-4 text-sm text-slate-900" />
                     </label>
                     <label className="space-y-2 text-sm text-slate-700">
-                      หมวดหมู่
+                      หมวดย่อย
                       <select value={item.category} onChange={(event) => handleItemChange(item.id, "category", event.target.value)} className="h-11 w-full rounded-xl border border-slate-200 bg-white px-4 text-sm text-slate-900">
                         {categories.map((option) => (
-                          <option key={option} value={option}>{option}</option>
+                          <option key={option} value={option}>{getCategoryLabel(option)}</option>
                         ))}
                       </select>
                     </label>
@@ -340,11 +341,11 @@ export function MemoEditorPage({ memoId }: { memoId?: string }) {
             <h2 className="text-lg font-semibold text-slate-900">สรุปคำขอ</h2>
             <div className="mt-5 space-y-4 text-sm text-slate-600">
               <div className="rounded-[20px] border border-slate-200 bg-slate-50 p-4">
-                <p className="text-slate-500">ยอดรวมประมาณการ</p>
+                <p className="text-slate-500">มูลค่ารวมประมาณการ</p>
                 <p className="mt-2 text-2xl font-semibold text-slate-900">{formatCurrency(total)}</p>
               </div>
               <div className="rounded-[20px] border border-slate-200 bg-slate-50 p-4">
-                <p className="text-slate-500">สถานะปัจจุบัน</p>
+                <p className="text-slate-500">Status ปัจจุบัน</p>
                 <div className="mt-2"><StatusBadge label={statusLabel} /></div>
               </div>
               <div className="rounded-[20px] border border-slate-200 bg-slate-50 p-4">
@@ -352,7 +353,7 @@ export function MemoEditorPage({ memoId }: { memoId?: string }) {
                 <p className="mt-2 font-semibold text-slate-900">{editingMemo?.currentApproverName ?? "นางสาวปัทมา วัฒนสุข"}</p>
               </div>
               <div className="rounded-[20px] border border-slate-200 bg-slate-50 p-4">
-                <p className="text-slate-500">เงินงบประมาณคงเหลือ</p>
+                <p className="text-slate-500">Budget คงเหลือ</p>
                 <p className="mt-2 font-semibold text-slate-900">{formatCurrency(editingMemo?.budgetRemaining ?? 380000)}</p>
               </div>
             </div>
@@ -361,22 +362,22 @@ export function MemoEditorPage({ memoId }: { memoId?: string }) {
           <div className="rounded-[24px] border border-slate-200 bg-white p-6 shadow-sm shadow-slate-200/50">
             <h2 className="text-lg font-semibold text-slate-900">การตรวจสอบระบบ</h2>
             <div className="mt-4 space-y-3 text-sm text-slate-600">
-              <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">Inventory stock check: OK</div>
-              <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">Budget validation: Approved</div>
-              <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">Vendor hint: Vendor master ready</div>
+              <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">ตรวจสอบสต็อก Inventory: ผ่าน</div>
+              <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">ตรวจสอบ Budget: ผ่าน</div>
+              <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">Vendor hint: Vendor master พร้อมใช้งาน</div>
             </div>
           </div>
 
           <div className="rounded-[24px] border border-slate-200 bg-white p-6 shadow-sm shadow-slate-200/50">
             <div className="space-y-3">
               <button type="button" onClick={handleSubmit} disabled={isSubmitting} className="h-10 w-full rounded-xl bg-[#007946] px-4 text-sm font-semibold text-white transition hover:bg-[#005f37] disabled:cursor-not-allowed disabled:opacity-60">
-                {isSubmitting ? "Processing..." : isRevision ? "Resubmit for Approval" : "Submit for Approval"}
+                {isSubmitting ? "กำลังประมวลผล..." : isRevision ? "ส่งกลับเพื่ออนุมัติอีกครั้ง" : "ส่งอนุมัติ"}
               </button>
               <button type="button" onClick={handleSaveDraft} disabled={isSubmitting} className="h-10 w-full rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60">
-                {isSubmitting ? "Processing..." : isEditing ? "Save Changes" : "Save Draft"}
+                {isSubmitting ? "กำลังประมวลผล..." : isEditing ? "บันทึกการเปลี่ยนแปลง" : "บันทึก Draft"}
               </button>
               <button type="button" onClick={() => router.push("/my-requests")} disabled={isSubmitting} className="h-10 w-full rounded-xl bg-slate-100 px-4 text-sm font-semibold text-slate-700 transition hover:bg-slate-200 disabled:cursor-not-allowed disabled:opacity-60">
-                Cancel
+                ยกเลิก
               </button>
             </div>
           </div>

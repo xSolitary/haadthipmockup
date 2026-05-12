@@ -6,6 +6,7 @@ import { CheckCircle2, RefreshCcw, XCircle } from "lucide-react";
 import { FormSection } from "@/components/ui/FormSection";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { StatusBadge } from "@/components/ui/StatusBadge";
+import { getCategoryLabel, getUrgencyLabel } from "@/lib/ui-text";
 import { useProcurementStore } from "@/store/useProcurementStore";
 
 const formatCurrency = (value: number) =>
@@ -41,15 +42,15 @@ export function MemoApprovalPage({ memoId }: { memoId: string }) {
   if (!memo || !canAct) {
     return (
       <div className="space-y-6">
-        <PageHeader title="Memo Approval" subtitle="ไม่สามารถดำเนินการกับ Memo รายการนี้ได้" />
+        <PageHeader title="อนุมัติ Memo" subtitle="ไม่สามารถดำเนินการกับ Memo รายการนี้ได้" />
         <div className="rounded-[24px] border border-slate-200 bg-white p-6 shadow-sm shadow-slate-200/50">
-          <p className="text-sm text-slate-600">Memo นี้ต้องอยู่ในสถานะ Pending Approval และต้องถูกมอบหมายให้ approver คนปัจจุบัน</p>
+          <p className="text-sm text-slate-600">Memo นี้ต้องอยู่ในสถานะ Pending Approval และต้องถูกมอบหมายให้ผู้อนุมัติปัจจุบัน</p>
           <button
             type="button"
             onClick={() => router.push("/my-requests")}
             className="mt-4 inline-flex h-10 items-center rounded-xl bg-[#007946] px-4 text-sm font-semibold text-white transition hover:bg-[#005f37]"
           >
-            กลับไป Procure-to-Pay
+            กลับไปหน้า Procure-to-Pay
           </button>
         </div>
       </div>
@@ -58,13 +59,13 @@ export function MemoApprovalPage({ memoId }: { memoId: string }) {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Approve Memo" subtitle="ตรวจสอบข้อมูล Memo แบบเต็มหน้าและตัดสินใจอนุมัติได้โดยไม่ใช้ modal" />
+      <PageHeader title="อนุมัติ Memo" subtitle="ตรวจสอบข้อมูล Memo แบบเต็มหน้าและตัดสินใจอนุมัติได้ทันที" />
       <div className="grid gap-6 xl:grid-cols-[2fr_1fr]">
         <div className="space-y-6">
-          <FormSection title="ข้อมูลผู้ขอ" description="รายละเอียดผู้ขอและหน่วยงานที่เกี่ยวข้อง">
+          <FormSection title="ข้อมูลผู้ขอซื้อ" description="รายละเอียดผู้ขอซื้อและหน่วยงานที่เกี่ยวข้อง">
             <div className="grid gap-4 md:grid-cols-2">
               <label className="space-y-2 text-sm text-slate-700">
-                ชื่อผู้ขอ
+                ชื่อผู้ขอซื้อ
                 <input readOnly value={memo.requesterName} className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 text-sm text-slate-900" />
               </label>
               <label className="space-y-2 text-sm text-slate-700">
@@ -84,13 +85,13 @@ export function MemoApprovalPage({ memoId }: { memoId: string }) {
                 <input readOnly value={memo.requestDate} className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 text-sm text-slate-900" />
               </label>
               <label className="space-y-2 text-sm text-slate-700">
-                วันที่ต้องการ
+                วันที่ต้องการใช้
                 <input readOnly value={memo.requiredDate} className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 text-sm text-slate-900" />
               </label>
             </div>
           </FormSection>
 
-          <FormSection title="รายละเอียดคำขอ" description="รายละเอียดคำขอที่ผู้ใช้ส่งมาเพื่อรอการอนุมัติ">
+          <FormSection title="รายละเอียดคำขอ" description="ข้อมูลคำขอที่ส่งมาเพื่อรอการอนุมัติ">
             <div className="space-y-4">
               <label className="space-y-2 text-sm text-slate-700">
                 หัวข้อ Memo
@@ -98,21 +99,21 @@ export function MemoApprovalPage({ memoId }: { memoId: string }) {
               </label>
               <div className="grid gap-4 md:grid-cols-2">
                 <label className="space-y-2 text-sm text-slate-700">
-                  หมวดการจัดซื้อ
-                  <input readOnly value={memo.category} className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 text-sm text-slate-900" />
+                  หมวดจัดซื้อ
+                  <input readOnly value={getCategoryLabel(memo.category)} className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 text-sm text-slate-900" />
                 </label>
                 <label className="space-y-2 text-sm text-slate-700">
                   ความเร่งด่วน
-                  <input readOnly value={memo.urgency} className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 text-sm text-slate-900" />
+                  <input readOnly value={getUrgencyLabel(memo.urgency)} className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 text-sm text-slate-900" />
                 </label>
               </div>
               <label className="space-y-2 text-sm text-slate-700">
                 วัตถุประสงค์ / เหตุผล
-                <textarea readOnly value={memo.purpose} rows={4} className="w-full rounded-[20px] border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900"></textarea>
+                <textarea readOnly value={memo.purpose} rows={4} className="w-full rounded-[20px] border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900" />
               </label>
               <div className="grid gap-4 md:grid-cols-2">
                 <label className="space-y-2 text-sm text-slate-700">
-                  รหัสงบประมาณ
+                  รหัส Budget
                   <input readOnly value={memo.budgetCode} className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 text-sm text-slate-900" />
                 </label>
                 <label className="space-y-2 text-sm text-slate-700">
@@ -123,13 +124,13 @@ export function MemoApprovalPage({ memoId }: { memoId: string }) {
             </div>
           </FormSection>
 
-          <FormSection title="รายการสินค้า / บริการ" description="รายการที่ร้องขอใน Memo นี้">
+          <FormSection title="รายการสินค้า / บริการ" description="รายการที่ระบุใน Memo ฉบับนี้">
             <div className="space-y-4">
               {memo.items.map((item) => (
                 <div key={item.id} className="rounded-[20px] border border-slate-200 bg-slate-50 p-4">
                   <div className="grid gap-4 md:grid-cols-[2fr_1fr_1fr]">
                     <div>
-                      <p className="text-sm text-slate-500">ชื่อสินค้า</p>
+                      <p className="text-sm text-slate-500">ชื่อรายการ</p>
                       <p className="mt-2 font-semibold text-slate-900">{item.name}</p>
                     </div>
                     <div>
@@ -137,7 +138,7 @@ export function MemoApprovalPage({ memoId }: { memoId: string }) {
                       <p className="mt-2 font-semibold text-slate-900">{item.quantity.toLocaleString()} {item.unit}</p>
                     </div>
                     <div>
-                      <p className="text-sm text-slate-500">ราคา/หน่วย</p>
+                      <p className="text-sm text-slate-500">ราคา / หน่วย</p>
                       <p className="mt-2 font-semibold text-slate-900">{formatCurrency(item.unitPrice)}</p>
                     </div>
                   </div>
@@ -156,40 +157,40 @@ export function MemoApprovalPage({ memoId }: { memoId: string }) {
                 <p className="mt-2 font-semibold text-slate-900">{memo.documentNumber}</p>
               </div>
               <div className="rounded-[20px] border border-slate-200 bg-slate-50 p-4">
-                <p className="text-sm text-slate-500">สถานะ</p>
+                <p className="text-sm text-slate-500">Status</p>
                 <div className="mt-2"><StatusBadge label={memo.status} /></div>
               </div>
               <div className="rounded-[20px] border border-slate-200 bg-slate-50 p-4">
-                <p className="text-sm text-slate-500">ยอดรวมประมาณการ</p>
+                <p className="text-sm text-slate-500">มูลค่ารวมประมาณการ</p>
                 <p className="mt-2 text-2xl font-semibold text-slate-900">{formatCurrency(memo.estimatedTotal)}</p>
               </div>
             </div>
           </div>
 
           <div className="rounded-[24px] border border-slate-200 bg-white p-6 shadow-sm shadow-slate-200/50">
-            <h2 className="text-lg font-semibold text-slate-900">Approval Decision</h2>
+            <h2 className="text-lg font-semibold text-slate-900">คำตัดสินอนุมัติ</h2>
             <textarea
               value={comment}
               onChange={(event) => setComment(event.target.value)}
               rows={5}
-              placeholder="ใส่หมายเหตุประกอบการตัดสินใจ"
+              placeholder="ระบุหมายเหตุประกอบการพิจารณา"
               className="mt-4 w-full rounded-[20px] border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900"
             />
             <div className="mt-4 space-y-3">
               <button type="button" onClick={() => handleAction("approve")} className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 text-sm font-semibold text-white transition hover:bg-emerald-700">
-                <CheckCircle2 className="h-4 w-4" /> Approve
+                <CheckCircle2 className="h-4 w-4" /> อนุมัติ
               </button>
               <button type="button" onClick={() => handleAction("revision")} className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-xl bg-amber-500 px-4 text-sm font-semibold text-white transition hover:bg-amber-600">
-                <RefreshCcw className="h-4 w-4" /> Request Revision
+                <RefreshCcw className="h-4 w-4" /> ขอแก้ไข
               </button>
               <button type="button" onClick={() => handleAction("reject")} className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-xl bg-rose-600 px-4 text-sm font-semibold text-white transition hover:bg-rose-700">
-                <XCircle className="h-4 w-4" /> Reject
+                <XCircle className="h-4 w-4" /> ปฏิเสธ
               </button>
             </div>
           </div>
 
           <div className="rounded-[24px] border border-slate-200 bg-white p-6 shadow-sm shadow-slate-200/50">
-            <h2 className="text-lg font-semibold text-slate-900">History</h2>
+            <h2 className="text-lg font-semibold text-slate-900">ประวัติรายการ</h2>
             <div className="mt-4 space-y-3">
               {memo.history.slice().reverse().map((entry, index) => (
                 <div key={`${entry.id}-${entry.date}-${entry.action}-${entry.actorId}-${index}`} className="rounded-[20px] border border-slate-200 bg-slate-50 p-4">

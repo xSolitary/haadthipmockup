@@ -1,9 +1,9 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { useProcurementStore } from "@/store/useProcurementStore";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { StatusBadge } from "@/components/ui/StatusBadge";
+import { useProcurementStore } from "@/store/useProcurementStore";
 
 const formatCurrency = (value: number) =>
   new Intl.NumberFormat("th-TH", { style: "currency", currency: "THB", maximumFractionDigits: 0 }).format(value);
@@ -43,13 +43,13 @@ export default function ReceivingPage() {
       coaMsds,
       qcRequired,
       qcStatus: qcRequired ? "Pending QC" : "Not Required",
-      notes: "รับสินค้าตาม PO และเผยแพร่ข้อมูลในระบบ",
+      notes: "รับสินค้าตาม PO และบันทึกข้อมูลเข้าระบบเรียบร้อย",
     });
   };
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Receiving & QC" subtitle="ติดตามการรับสินค้าจากผู้ขายและสถานะการตรวจสอบคุณภาพ" />
+      <PageHeader title="Receiving & QC" subtitle="ติดตามการรับสินค้าจาก Vendor และสถานะการตรวจสอบคุณภาพ" />
       <div className="grid gap-6 xl:grid-cols-[1fr_1.2fr]">
         <div className="rounded-[24px] border border-slate-200 bg-white p-5 shadow-sm shadow-slate-200/50 sm:p-6">
           <h2 className="text-lg font-semibold text-slate-900">PO รอรับสินค้า</h2>
@@ -68,11 +68,11 @@ export default function ReceivingPage() {
                   <div className="flex items-center justify-between gap-3">
                     <div>
                       <p className="font-semibold text-slate-900">{po.documentNumber}</p>
-                  <p className="text-sm text-slate-500">{po.selectedVendorName ?? po.vendorName}</p>
+                      <p className="text-sm text-slate-500">{po.selectedVendorName ?? po.vendorName}</p>
                     </div>
                     <StatusBadge label={po.procurementStatus} />
                   </div>
-                  <p className="mt-3 text-sm text-slate-600">ยอด {formatCurrency(po.amount)}</p>
+                  <p className="mt-3 text-sm text-slate-600">ยอดเงิน {formatCurrency(po.amount)}</p>
                 </button>
               ))
             )}
@@ -135,7 +135,7 @@ export default function ReceivingPage() {
                     COA / MSDS พร้อมใช้งาน
                   </label>
                   <button type="button" onClick={handleReceive} className="inline-flex h-10 items-center justify-center rounded-xl bg-[#007946] px-4 text-sm font-semibold text-white transition hover:bg-[#005f37]">
-                    รับสินค้า
+                    ยืนยันรับสินค้า
                   </button>
                 </div>
               </>
@@ -151,7 +151,7 @@ export default function ReceivingPage() {
                   <p className="mt-2 text-base font-semibold text-slate-900">{existingRecord.qcStatus}</p>
                 </div>
                 <button type="button" onClick={() => selectedOrder && void markQcPassed(selectedOrder.id)} className="inline-flex h-10 items-center rounded-xl bg-emerald-600 px-4 text-sm font-semibold text-white transition hover:bg-emerald-700">
-                  Mark QC Passed
+                  ยืนยันผ่าน QC
                 </button>
               </div>
             </div>

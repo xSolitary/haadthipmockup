@@ -162,11 +162,11 @@ export default function DashboardPage() {
   const categoryInsight = !topCategory
     ? "ยังไม่มีข้อมูลเพียงพอสำหรับสรุปแนวโน้มการใช้จ่าย"
     : topCategory.percent >= 45
-      ? `การใช้จ่ายกระจุกอยู่ที่หมวด ${topCategory.name} ค่อนข้างมาก ควรติดตามงบและแผนจัดซื้ออย่างใกล้ชิด`
-      : `สัดส่วนการใช้จ่ายค่อนข้างกระจาย โดย ${topCategory.name} ยังเป็นหมวดหลักของช่วงเวลานี้`;
+      ? `การใช้จ่ายกระจุกอยู่ในหมวด ${topCategory.name} ค่อนข้างมาก ควรติดตาม Budget และแผนจัดซื้อต่อเนื่อง`
+      : `สัดส่วนการใช้จ่ายค่อนข้างกระจาย โดยหมวด ${topCategory.name} ยังเป็นหมวดหลักของช่วงเวลานี้`;
   const suggestedAction = !topCategory
-    ? "ขยายช่วงวันที่หรือเพิ่มรายการ Memo เพื่อดูภาพรวมที่ชัดขึ้น"
-    : `ตรวจสอบรายการในหมวด ${topCategory.name} และวางแผนจัดซื้อรอบถัดไปล่วงหน้าเพื่อลดงานเร่งด่วน`;
+    ? "ขยายช่วงวันที่หรือเพิ่มรายการ Memo เพื่อดูภาพรวมให้ชัดขึ้น"
+    : `ตรวจสอบรายการในหมวด ${topCategory.name} และวางแผนจัดซื้อล่วงหน้าเพื่อลดงานเร่งด่วน`;
 
   return (
     <div className="space-y-6 text-slate-900">
@@ -176,14 +176,14 @@ export default function DashboardPage() {
             <p className="inline-flex rounded-full bg-[var(--surface-tint)] px-3 py-1 text-xs font-semibold tracking-[0.12em] text-[var(--primary-ink)]">Dashboard</p>
             <h1 className="mt-3 text-3xl font-bold tracking-normal text-slate-900 md:text-4xl">ภาพรวมการจัดซื้อ</h1>
             <p className="mt-2 text-sm leading-6 tracking-normal text-slate-500">
-              ติดตาม KPI งานค้าง และโครงสร้างการใช้จ่ายตามช่วงวันที่ที่เลือก โดยยังคงใช้ข้อมูลเดิมจากระบบทั้งหมด
+              ติดตาม KPI งานค้างและโครงสร้างการใช้จ่ายตามช่วงวันที่ที่เลือก โดยอ้างอิงข้อมูลชุดเดิมของระบบ
             </p>
           </div>
 
           <div className="grid gap-3 sm:grid-cols-[auto_1fr_1fr] sm:items-center">
             <div className="inline-flex h-11 items-center gap-2 rounded-[18px] border border-[var(--border)] bg-[var(--surface-tint)] px-4 text-sm font-medium tracking-normal text-slate-700">
               <CalendarRange className="h-4 w-4 text-[var(--primary)]" />
-              Date Range
+              ช่วงวันที่
             </div>
             <input
               type="date"
@@ -204,12 +204,12 @@ export default function DashboardPage() {
       </section>
 
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-6">
-        <DashboardKpiCard label="Memo Count" value={memoCount.toString()} />
-        <DashboardKpiCard label="PR Count" value={prCount.toString()} />
-        <DashboardKpiCard label="PO Count" value={poCount.toString()} />
-        <DashboardKpiCard label="Transaction Count" value={transactionCount.toString()} />
-        <DashboardKpiCard label="Budget Amount" value={formatCurrency(budgetAmount)} />
-        <DashboardKpiCard label="Spent Amount" value={formatCurrency(spentAmount)} />
+        <DashboardKpiCard label="จำนวน Memo" value={memoCount.toString()} />
+        <DashboardKpiCard label="จำนวน PR" value={prCount.toString()} />
+        <DashboardKpiCard label="จำนวน PO" value={poCount.toString()} />
+        <DashboardKpiCard label="จำนวนรายการรวม" value={transactionCount.toString()} />
+        <DashboardKpiCard label="Budget รวม" value={formatCurrency(budgetAmount)} />
+        <DashboardKpiCard label="ยอดใช้จ่าย" value={formatCurrency(spentAmount)} />
       </section>
 
       <section className="grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
@@ -217,8 +217,8 @@ export default function DashboardPage() {
           <section className={`${cardClassName} p-6`}>
             <div className="flex items-center justify-between gap-4 border-b border-[var(--border)] pb-4">
               <div>
-                <p className="text-sm font-medium tracking-normal text-[var(--primary)]">My Work Queue</p>
-                <h2 className="mt-1 text-2xl font-bold tracking-normal text-slate-900">Action Required from Me</h2>
+                <p className="text-sm font-medium tracking-normal text-[var(--primary)]">งานที่ต้องดำเนินการ</p>
+                <h2 className="mt-1 text-2xl font-bold tracking-normal text-slate-900">งานที่รอดำเนินการจากฉัน</h2>
               </div>
               <div className="hidden rounded-2xl bg-[var(--surface-tint)] p-3 text-[var(--primary)] md:block">
                 <TrendingUp className="h-5 w-5" />
@@ -227,26 +227,26 @@ export default function DashboardPage() {
 
             <div className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
               <ActionCard href="/my-requests" title="Create Memo" value={memoActionCount.toString()} icon={FilePlus2} />
-              <ActionCard href="/my-requests" title="Approvals Left" value={approvalsLeft.toString()} icon={TimerReset} />
-              <ActionCard href="/pr-po" title="Vendor Selection" value={vendorSelectionsLeft.toString()} icon={PackageSearch} />
-              <ActionCard title="SAP (Dummy)" value="0" icon={Shapes} muted />
+              <ActionCard href="/my-requests" title="รออนุมัติ" value={approvalsLeft.toString()} icon={TimerReset} />
+              <ActionCard href="/pr-po" title="คัดเลือก Vendor" value={vendorSelectionsLeft.toString()} icon={PackageSearch} />
+              <ActionCard title="SAP (Mock)" value="0" icon={Shapes} muted />
             </div>
           </section>
 
           <section className={`${cardClassName} p-6`}>
             <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
               <div>
-                <p className="text-sm font-medium tracking-normal text-[var(--primary)]">System Status</p>
+                <p className="text-sm font-medium tracking-normal text-[var(--primary)]">สถานะระบบ</p>
                 <h2 className="mt-1 text-xl font-bold tracking-normal text-slate-900">ERP / Inventory Status</h2>
               </div>
-              <span className="inline-flex rounded-full bg-[var(--surface-tint)] px-3 py-1 text-xs font-medium tracking-normal text-[var(--primary-ink)]">Operational</span>
+              <span className="inline-flex rounded-full bg-[var(--surface-tint)] px-3 py-1 text-xs font-medium tracking-normal text-[var(--primary-ink)]">พร้อมใช้งาน</span>
             </div>
 
             <div className="mt-5 grid gap-4 sm:grid-cols-2">
               {[
                 { label: "ERP Sync", value: "Connected" },
-                { label: "Inventory", value: "Updated 5 mins ago" },
-                { label: "Vendor Master", value: "Ready" },
+                { label: "Inventory", value: "อัปเดตเมื่อ 5 นาทีที่แล้ว" },
+                { label: "Vendor Master", value: "พร้อมใช้งาน" },
                 { label: "Budget Control", value: "Active" },
               ].map((item) => (
                 <div key={item.label} className="rounded-[22px] border border-[var(--border)] bg-[var(--surface-muted)] p-4">
@@ -261,9 +261,9 @@ export default function DashboardPage() {
         <section className={`${cardClassName} overflow-hidden p-6`}>
           <div className="flex flex-col gap-2">
             <p className="text-sm font-medium tracking-normal text-[var(--primary)]">Spend Insight</p>
-            <h2 className="text-xl font-bold tracking-normal text-slate-900">Category Spend Mix</h2>
+            <h2 className="text-xl font-bold tracking-normal text-slate-900">สัดส่วนการใช้จ่ายตามหมวด</h2>
             <p className="text-sm leading-6 tracking-normal text-slate-500">
-              กราฟสรุปสัดส่วนการใช้จ่ายตามหมวดจัดซื้อในช่วงวันที่ที่เลือก พร้อมคำอธิบายสั้น ๆ เพื่อช่วยมองเห็นความเสี่ยงและแนวทางถัดไป
+              กราฟสรุปสัดส่วนการใช้จ่ายตามหมวดจัดซื้อในช่วงวันที่ที่เลือก พร้อมข้อความสรุปเพื่อช่วยมองเห็นความเสี่ยงและแนวทางดำเนินการ
             </p>
           </div>
 
@@ -288,16 +288,16 @@ export default function DashboardPage() {
                 )
               ) : (
                 <div className="flex h-full items-center justify-center rounded-3xl border border-dashed border-slate-300 bg-[var(--surface-strong)] text-sm tracking-normal text-slate-400">
-                  Preparing chart...
+                  กำลังเตรียมกราฟ...
                 </div>
               )}
             </div>
 
             <div className="mt-5 space-y-3">
-              <h3 className="text-sm font-semibold tracking-normal text-slate-900">Graph Explanation</h3>
+              <h3 className="text-sm font-semibold tracking-normal text-slate-900">คำอธิบายกราฟ</h3>
               <div className="grid gap-3">
                 <div className="rounded-[22px] bg-[var(--surface-strong)] p-4 shadow-[var(--shadow-sm)]">
-                  <p className="text-xs font-medium tracking-normal text-slate-500">หมวดใช้จ่ายสูงสุด</p>
+                  <p className="text-xs font-medium tracking-normal text-slate-500">หมวดที่ใช้จ่ายสูงสุด</p>
                   <p className="mt-2 text-sm font-semibold tracking-normal text-slate-900">
                     {topCategory
                       ? `${topCategory.name} คิดเป็น ${topCategory.percent.toFixed(1)}% ของยอดใช้จ่ายรวม (${formatCurrency(topCategory.value)})`
@@ -305,15 +305,15 @@ export default function DashboardPage() {
                   </p>
                 </div>
                 <div className="rounded-[22px] bg-[var(--surface-strong)] p-4 shadow-[var(--shadow-sm)]">
-                  <p className="text-xs font-medium tracking-normal text-slate-500">ความเสี่ยง / Insight</p>
+                  <p className="text-xs font-medium tracking-normal text-slate-500">Insight</p>
                   <p className="mt-2 text-sm leading-6 tracking-normal text-slate-700">
                     {topCategory && topCategoryGap !== null && topCategoryGap > 15
-                      ? `${categoryInsight} โดยทิ้งห่างหมวดรองลงมา ${topCategoryGap.toFixed(1)} จุด`
+                      ? `${categoryInsight} โดยมีสัดส่วนสูงกว่าหมวดรองลงมา ${topCategoryGap.toFixed(1)} จุด`
                       : categoryInsight}
                   </p>
                 </div>
                 <div className="rounded-[22px] bg-[var(--surface-strong)] p-4 shadow-[var(--shadow-sm)]">
-                  <p className="text-xs font-medium tracking-normal text-slate-500">Suggested Action</p>
+                  <p className="text-xs font-medium tracking-normal text-slate-500">ข้อเสนอแนะ</p>
                   <p className="mt-2 text-sm leading-6 tracking-normal text-slate-700">{suggestedAction}</p>
                 </div>
               </div>

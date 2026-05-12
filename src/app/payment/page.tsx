@@ -1,10 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { useProcurementStore } from "@/store/useProcurementStore";
-import { PageHeader } from "@/components/ui/PageHeader";
 import { DataTable } from "@/components/ui/DataTable";
+import { PageHeader } from "@/components/ui/PageHeader";
 import { StatusBadge } from "@/components/ui/StatusBadge";
+import { useProcurementStore } from "@/store/useProcurementStore";
 
 const formatCurrency = (value: number) =>
   new Intl.NumberFormat("th-TH", { style: "currency", currency: "THB", maximumFractionDigits: 0 }).format(value);
@@ -30,20 +30,20 @@ export default function PaymentPage() {
   const actionLabel = selectedPayment?.status === "Pending Invoice"
     ? "ยืนยัน Invoice"
     : selectedPayment?.status === "Ready for AP Posting"
-    ? "อนุมัติสำหรับจ่าย"
-    : selectedPayment?.status === "Approved for Payment"
-    ? "ทำเครื่องหมายว่า Paid"
-    : "เสร็จสิ้น";
+      ? "อนุมัติชำระเงิน"
+      : selectedPayment?.status === "Approved for Payment"
+        ? "ทำเครื่องหมายว่า Paid"
+        : "เสร็จสิ้น";
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Payment Request" subtitle="ติดตามความพร้อมในการจ่ายเงินและการจับคู่ข้อมูลใบสั่งซื้อ" />
+      <PageHeader title="Payment" subtitle="ติดตามความพร้อมในการจ่ายเงินและการจับคู่ข้อมูลใบสั่งซื้อ" />
       <div className="grid gap-6 xl:grid-cols-[1fr_1.2fr]">
         <div className="rounded-[24px] border border-slate-200 bg-white p-5 shadow-sm shadow-slate-200/50 sm:p-6">
-          <h2 className="text-lg font-semibold text-slate-900">รายการจ่ายเงิน</h2>
-          <p className="mt-2 text-sm text-slate-500">ติดตามสถานะการจ่ายเงินสำหรับ PO ที่ผ่าน QC แล้ว</p>
+          <h2 className="text-lg font-semibold text-slate-900">รายการ Payment</h2>
+          <p className="mt-2 text-sm text-slate-500">ติดตามสถานะการชำระเงินสำหรับ PO ที่ผ่าน QC แล้ว</p>
           <div className="mt-5">
-            <DataTable headers={["PO", "ผู้ขาย", "ยอดใบแจ้งหนี้", "สถานะ"]}>
+            <DataTable headers={["PO", "Vendor", "ยอด Invoice", "Status"]}>
               {paymentRequests.map((payment) => (
                 <tr key={payment.id} className="cursor-pointer border-t border-slate-100 hover:bg-slate-50" onClick={() => setSelectedPaymentId(payment.id)}>
                   <td className="px-5 py-4">{payment.poNumber}</td>
@@ -68,22 +68,22 @@ export default function PaymentPage() {
                 </div>
                 <div className="grid gap-4 text-sm text-slate-600">
                   <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                    <p className="text-xs tracking-normal text-slate-400">PO amount</p>
+                    <p className="text-xs tracking-normal text-slate-400">ยอดตาม PO</p>
                     <p className="mt-2 text-lg font-semibold text-slate-900">{formatCurrency(selectedPayment.invoiceAmount)}</p>
                   </div>
                   <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                    <p className="text-xs tracking-normal text-slate-400">Receiving amount</p>
+                    <p className="text-xs tracking-normal text-slate-400">ยอดรับสินค้า</p>
                     <p className="mt-2 text-lg font-semibold text-slate-900">{formatCurrency(selectedPayment.receivingAmount)}</p>
                   </div>
                   <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                    <p className="text-xs tracking-normal text-slate-400">Matching status</p>
+                    <p className="text-xs tracking-normal text-slate-400">ผลการจับคู่ข้อมูล</p>
                     <p className="mt-2 text-lg font-semibold text-slate-900">
-                      {selectedPayment.invoiceAmount === selectedPayment.receivingAmount ? "Matched" : "Pending Review"}
+                      {selectedPayment.invoiceAmount === selectedPayment.receivingAmount ? "Matched" : "รอตรวจสอบ"}
                     </p>
                   </div>
                   <label className="rounded-[20px] border border-slate-200 bg-slate-100 p-4 text-sm text-slate-700">
-                    <span className="block text-xs tracking-normal text-slate-400">Invoice upload</span>
-                    <span className="mt-2 block font-semibold text-slate-900">{selectedPayment.invoiceUploaded ? "ใบแจ้งหนี้อัปโหลดแล้ว" : "ยังไม่ได้อัปโหลด"}</span>
+                    <span className="block text-xs tracking-normal text-slate-400">สถานะการอัปโหลด Invoice</span>
+                    <span className="mt-2 block font-semibold text-slate-900">{selectedPayment.invoiceUploaded ? "อัปโหลด Invoice แล้ว" : "ยังไม่ได้อัปโหลด"}</span>
                   </label>
                   <button
                     type="button"

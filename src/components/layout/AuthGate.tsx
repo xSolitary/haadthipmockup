@@ -2,8 +2,9 @@
 
 import { useRouter } from "next/navigation";
 import { BriefcaseBusiness, CheckCircle2, ShieldCheck, ShoppingCart } from "lucide-react";
-import { useProcurementStore } from "@/store/useProcurementStore";
 import type { Role } from "@/lib/types";
+import { getRoleLabel } from "@/lib/ui-text";
+import { useProcurementStore } from "@/store/useProcurementStore";
 
 const roleCards: Array<{
   role: Extract<Role, "Requester" | "Approver" | "Purchasing">;
@@ -13,20 +14,20 @@ const roleCards: Array<{
 }> = [
   {
     role: "Requester",
-    title: "Requester",
-    subtitle: "Create memos and track PR / PO progress",
+    title: "ผู้ขอซื้อ",
+    subtitle: "Create Memo และติดตามความคืบหน้า PR / PO",
     icon: BriefcaseBusiness,
   },
   {
     role: "Approver",
-    title: "Approver",
-    subtitle: "Review requests and confirm vendor decisions",
+    title: "ผู้อนุมัติ",
+    subtitle: "ตรวจสอบคำขอและยืนยันการเลือก Vendor",
     icon: ShieldCheck,
   },
   {
     role: "Purchasing",
-    title: "Purchasing",
-    subtitle: "Propose vendors and progress PR to PO",
+    title: "จัดซื้อ",
+    subtitle: "เสนอ Vendor และดำเนินการ PR ต่อไปยัง PO",
     icon: ShoppingCart,
   },
 ];
@@ -54,15 +55,15 @@ export function AuthGate() {
       <div className="relative z-10 w-full max-w-6xl rounded-[36px] border border-white/80 bg-white/88 p-6 shadow-[0_30px_80px_rgba(15,23,42,0.12)] backdrop-blur">
         <div className="flex flex-col gap-4 border-b border-slate-200/80 px-3 pb-6 md:flex-row md:items-end md:justify-between">
           <div>
-            <p className="text-sm font-semibold text-[#007946]">Permission</p>
-            <h1 className="mt-2 text-3xl font-semibold text-slate-900">Choose your working role</h1>
+            <p className="text-sm font-semibold text-[#007946]">สิทธิ์การใช้งาน</p>
+            <h1 className="mt-2 text-3xl font-semibold text-slate-900">เลือก Role สำหรับเข้าใช้งาน</h1>
             <p className="mt-2 max-w-2xl text-sm text-slate-500">
-              Select a mock role to enter the portal. The selection is stored locally and keeps the existing demo data intact.
+              เลือก Role จำลองเพื่อเข้าสู่ระบบ ข้อมูลจะถูกเก็บไว้ในเครื่องและยังคงใช้ชุดข้อมูลเดโมเดิม
             </p>
           </div>
           <div className="inline-flex items-center gap-2 rounded-full bg-[#f0f9f6] px-4 py-2 text-sm font-medium text-[#007946]">
             <CheckCircle2 className="h-4 w-4" />
-            Mock login only
+            Mock Login เท่านั้น
           </div>
         </div>
 
@@ -87,6 +88,7 @@ export function AuthGate() {
                 <div className="mt-16">
                   <h2 className="text-[2rem] font-semibold">{title}</h2>
                   <p className={`mt-3 max-w-xs text-sm ${highlighted ? "text-white/85" : "text-slate-500"}`}>{subtitle}</p>
+                  <p className={`mt-3 text-xs ${highlighted ? "text-white/75" : "text-slate-400"}`}>Role: {getRoleLabel(role)}</p>
                 </div>
               </button>
             );

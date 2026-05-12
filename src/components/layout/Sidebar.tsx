@@ -2,22 +2,16 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import {
-  BarChart3,
-  CreditCard,
-  Home,
-  Layers,
-  Settings,
-  Truck,
-} from "lucide-react";
+import { BarChart3, CreditCard, Home, Layers, LogOut, Settings, Truck } from "lucide-react";
+import { useCurrentUserProfile } from "@/components/layout/useCurrentUserProfile";
 
 const navItems = [
   { label: "Dashboard", href: "/", icon: Home },
   { label: "Procure-to-Pay", href: "/my-requests", icon: Layers },
   { label: "Receiving & QC", href: "/receiving", icon: Truck },
   { label: "Payment", href: "/payment", icon: CreditCard },
-  { label: "Reports", href: "/reports", icon: BarChart3 },
-  { label: "Admin Settings", href: "/admin", icon: Settings },
+  { label: "รายงาน", href: "/reports", icon: BarChart3 },
+  { label: "ตั้งค่าระบบ", href: "/admin", icon: Settings },
 ];
 
 function HaadthipWordmark() {
@@ -36,6 +30,7 @@ function HaadthipWordmark() {
 
 export function Sidebar() {
   const pathname = usePathname();
+  const { currentUser, initials, roleLabel, handleLogout } = useCurrentUserProfile();
 
   return (
     <aside className="sticky top-0 hidden h-screen min-h-screen w-[308px] shrink-0 border-r border-[var(--border)] bg-[rgba(250,248,243,0.82)] px-5 py-5 backdrop-blur-xl lg:block">
@@ -46,7 +41,7 @@ export function Sidebar() {
 
         <div className="mt-2 px-2">
           <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">
-            Main
+            เมนูหลัก
           </p>
         </div>
 
@@ -81,6 +76,31 @@ export function Sidebar() {
             );
           })}
         </nav>
+
+        <div className="mt-6 pt-4">
+          <div className="rounded-[28px] border border-[var(--border)] bg-[rgba(255,255,255,0.9)] p-3 shadow-[var(--shadow-md)]">
+            <div className="flex items-center gap-3">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-[linear-gradient(135deg,#007946_0%,#2eaf72_100%)] text-sm font-semibold text-white shadow-[0_10px_20px_rgba(0,121,70,0.2)]">
+                {initials}
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="truncate text-sm font-semibold text-slate-900">
+                  {currentUser?.name ?? "HaadThip User"}
+                </div>
+                <div className="mt-1 truncate text-xs text-slate-500">{roleLabel}</div>
+              </div>
+              <button
+                type="button"
+                onClick={handleLogout}
+                className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-[var(--border)] bg-[var(--surface)] text-slate-500 shadow-[var(--shadow-sm)] hover:border-[#007946]/20 hover:bg-[var(--surface-tint)] hover:text-[var(--primary)]"
+                aria-label="ออกจากระบบ"
+                title="ออกจากระบบ"
+              >
+                <LogOut className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
     </aside>
   );

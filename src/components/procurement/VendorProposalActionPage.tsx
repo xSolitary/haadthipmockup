@@ -3,9 +3,11 @@
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Check, Pencil, Plus, Trash2 } from "lucide-react";
+import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { FormSection } from "@/components/ui/FormSection";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { StatusBadge } from "@/components/ui/StatusBadge";
+import { SuccessModal } from "@/components/ui/SuccessModal";
 import { useProcurementStore } from "@/store/useProcurementStore";
 
 const formatCurrency = (value: number) =>
@@ -57,6 +59,16 @@ export function VendorProposalActionPage({ poId }: { poId: string }) {
         .map((proposal) => proposal.id) ?? [],
   );
   const [proposalForm, setProposalForm] = useState(emptyProposalForm);
+  const [confirmingProposalId, setConfirmingProposalId] = useState<string | null>(null);
+  const [successModal, setSuccessModal] = useState<{
+    open: boolean;
+    title: string;
+    description: string;
+  }>({
+    open: false,
+    title: "",
+    description: "",
+  });
 
   const submittedProposals = useMemo(
     () => purchaseOrder?.vendorProposals.filter((proposal) => proposal.submittedToApprover) ?? [],
@@ -119,20 +131,36 @@ export function VendorProposalActionPage({ poId }: { poId: string }) {
   const handleConfirmSelected = async () => {
     if (!purchaseOrder || selectedProposalIds.length === 0) return;
     await submitVendorProposals(purchaseOrder.id, selectedProposalIds);
+    setSuccessModal({
+      open: true,
+      title: "เลือก Vendor สำเร็จ",
+      description: "ระบบได้บันทึกรายการ Vendor ที่เลือก และส่งต่อให้หัวหน้าอนุมัติแล้ว",
+    });
+  };
+
+  const handleApproveVendor = async () => {
+    if (!purchaseOrder || !confirmingProposalId) return;
+    await approveVendorSelection(purchaseOrder.id, confirmingProposalId, approvalComment);
+    setConfirmingProposalId(null);
+    setSuccessModal({
+      open: true,
+      title: "ยืนยัน Vendor สำเร็จ",
+      description: "ระบบได้บันทึกการอนุมัติ Vendor แล้ว",
+    });
   };
 
   if (!purchaseOrder || (!canPurchasingAct && !canApproverAct)) {
     return (
       <div className="space-y-6">
-        <PageHeader title="PR Action" subtitle="ไม่สามารถเข้าถึงหน้าดำเนินการ PR รายการนี้ได้" />
+        <PageHeader title="ดำเนินการ PR" subtitle="ไม่สามารถเข้าถึงหน้าดำเนินการ PR รายการนี้ได้" />
         <div className="rounded-[24px] border border-slate-200 bg-white p-6 shadow-sm shadow-slate-200/50">
-          <p className="text-sm text-slate-600">หน้านี้สำหรับ Purchasing เพื่อจัดการ vendor proposal และสำหรับ Approver เพื่อยืนยัน vendor เท่านั้น</p>
+          <p className="text-sm text-slate-600">หน้านี้สำหรับทีมจัดซื้อเพื่อจัดการ Vendor proposal และสำหรับผู้อนุมัติเพื่อยืนยัน Vendor เท่านั้น</p>
           <button
             type="button"
             onClick={() => router.push("/my-requests")}
             className="mt-4 inline-flex h-10 items-center rounded-xl bg-[#007946] px-4 text-sm font-semibold text-white transition hover:bg-[#005f37]"
           >
-            กลับไป Procure-to-Pay
+            กลับไปหน้า Procure-to-Pay
           </button>
         </div>
       </div>
@@ -142,15 +170,15 @@ export function VendorProposalActionPage({ poId }: { poId: string }) {
   return (
     <div className="space-y-6">
       <PageHeader
-        title={canPurchasingAct ? "Manage Vendor Proposals" : "Approve Vendor Selection"}
-        subtitle="จัดการรายการ vendor options แบบเต็มหน้า โดยเก็บสถานะเดิมไว้ใน localStorage"
+        title={canPurchasingAct ? "จัดการ Vendor Proposal" : "อนุมัติการเลือก Vendor"}
+        subtitle="จัดการตัวเลือก Vendor แบบเต็มหน้า โดยคงสถานะและข้อมูลเดิมไว้ใน LocalStorage"
       />
       <div className="grid gap-6 xl:grid-cols-[2fr_1fr]">
         <div className="space-y-6">
-          <FormSection title="PR Summary" description="รายละเอียดคำขอที่กำลังอยู่ในขั้นตอน vendor selection">
+          <FormSection title="สรุป PR" description="รายละเอียดคำขอที่อยู่ในขั้นตอนคัดเลือก Vendor">
             <div className="grid gap-4 md:grid-cols-2">
               <div className="rounded-[20px] border border-slate-200 bg-slate-50 p-4">
-                <p className="text-sm text-slate-500">PR Number</p>
+                <p className="text-sm text-slate-500">เลขที่ PR</p>
                 <p className="mt-2 font-semibold text-slate-900">{purchaseOrder.prNumber ?? purchaseOrder.documentNumber}</p>
               </div>
               <div className="rounded-[20px] border border-slate-200 bg-slate-50 p-4">
@@ -158,31 +186,31 @@ export function VendorProposalActionPage({ poId }: { poId: string }) {
                 <div className="mt-2"><StatusBadge label={purchaseOrder.procurementStatus} /></div>
               </div>
               <div className="rounded-[20px] border border-slate-200 bg-slate-50 p-4 md:col-span-2">
-                <p className="text-sm text-slate-500">Memo Title</p>
+                <p className="text-sm text-slate-500">หัวข้อ Memo</p>
                 <p className="mt-2 font-semibold text-slate-900">{purchaseOrder.memoTitle}</p>
               </div>
             </div>
           </FormSection>
 
           {canPurchasingAct ? (
-            <FormSection title="Vendor Proposal Form" description="เพิ่มหรือแก้ไข vendor option ก่อนส่งให้ approver">
+            <FormSection title="ฟอร์ม Vendor Proposal" description="เพิ่มหรือแก้ไขตัวเลือก Vendor ก่อนส่งให้ผู้อนุมัติ">
               <div className="grid gap-4 md:grid-cols-2">
-                <input value={proposalForm.vendorName} onChange={(event) => setProposalForm((current) => ({ ...current, vendorName: event.target.value }))} placeholder="Vendor name" className="h-11 rounded-xl border border-slate-200 bg-white px-4 text-sm text-slate-900" />
-                <input type="number" min={0} value={proposalForm.quotedPrice} onChange={(event) => setProposalForm((current) => ({ ...current, quotedPrice: event.target.value }))} placeholder="Quoted price" className="h-11 rounded-xl border border-slate-200 bg-white px-4 text-sm text-slate-900" />
+                <input value={proposalForm.vendorName} onChange={(event) => setProposalForm((current) => ({ ...current, vendorName: event.target.value }))} placeholder="ชื่อ Vendor" className="h-11 rounded-xl border border-slate-200 bg-white px-4 text-sm text-slate-900" />
+                <input type="number" min={0} value={proposalForm.quotedPrice} onChange={(event) => setProposalForm((current) => ({ ...current, quotedPrice: event.target.value }))} placeholder="ราคาที่เสนอ" className="h-11 rounded-xl border border-slate-200 bg-white px-4 text-sm text-slate-900" />
                 <input value={proposalForm.leadTime} onChange={(event) => setProposalForm((current) => ({ ...current, leadTime: event.target.value }))} placeholder="Lead time" className="h-11 rounded-xl border border-slate-200 bg-white px-4 text-sm text-slate-900" />
                 <input value={proposalForm.paymentTerms} onChange={(event) => setProposalForm((current) => ({ ...current, paymentTerms: event.target.value }))} placeholder="Payment terms" className="h-11 rounded-xl border border-slate-200 bg-white px-4 text-sm text-slate-900" />
-                <input value={proposalForm.attachmentName} onChange={(event) => setProposalForm((current) => ({ ...current, attachmentName: event.target.value }))} placeholder="Attachment name" className="h-11 rounded-xl border border-slate-200 bg-white px-4 text-sm text-slate-900" />
+                <input value={proposalForm.attachmentName} onChange={(event) => setProposalForm((current) => ({ ...current, attachmentName: event.target.value }))} placeholder="ชื่อเอกสารแนบ" className="h-11 rounded-xl border border-slate-200 bg-white px-4 text-sm text-slate-900" />
                 <input value={proposalForm.attachmentUrl} onChange={(event) => setProposalForm((current) => ({ ...current, attachmentUrl: event.target.value }))} placeholder="Attachment URL" className="h-11 rounded-xl border border-slate-200 bg-white px-4 text-sm text-slate-900" />
-                <textarea value={proposalForm.notes} onChange={(event) => setProposalForm((current) => ({ ...current, notes: event.target.value }))} placeholder="Notes" rows={3} className="md:col-span-2 rounded-[20px] border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900" />
+                <textarea value={proposalForm.notes} onChange={(event) => setProposalForm((current) => ({ ...current, notes: event.target.value }))} placeholder="หมายเหตุ" rows={3} className="md:col-span-2 rounded-[20px] border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900" />
               </div>
               <div className="mt-4 flex flex-wrap gap-3">
                 <button type="button" onClick={handleSaveProposal} className="inline-flex h-10 items-center gap-2 rounded-xl bg-[#007946] px-4 text-sm font-semibold text-white transition hover:bg-[#005f37]">
                   {editingProposalId ? <Check className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
-                  {editingProposalId ? "Update Proposal" : "Add Proposal"}
+                  {editingProposalId ? "บันทึกการแก้ไข" : "เพิ่ม Proposal"}
                 </button>
                 {editingProposalId ? (
                   <button type="button" onClick={resetForm} className="inline-flex h-10 items-center rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 transition hover:bg-slate-50">
-                    Cancel Edit
+                    ยกเลิกการแก้ไข
                   </button>
                 ) : null}
               </div>
@@ -190,13 +218,13 @@ export function VendorProposalActionPage({ poId }: { poId: string }) {
           ) : null}
 
           <FormSection
-            title={canPurchasingAct ? "Vendor Options" : "Submitted Vendor Options"}
-            description={canPurchasingAct ? "เลือกหลาย vendor ด้วย checkbox แล้วกดยืนยันเพื่อส่งให้ approver" : "approver จะเห็นเฉพาะ vendor options ที่ purchasing ส่งเข้ามา"}
+            title={canPurchasingAct ? "ตัวเลือก Vendor" : "Vendor ที่ส่งให้อนุมัติ"}
+            description={canPurchasingAct ? "เลือก Vendor ที่ต้องการส่งต่อ แล้วกดยืนยันเพื่อส่งให้ผู้อนุมัติ" : "ผู้อนุมัติจะเห็นเฉพาะ Vendor ที่ฝ่ายจัดซื้อส่งมา"}
           >
             <div className="space-y-4">
               {(canPurchasingAct ? purchaseOrder.vendorProposals : submittedProposals).length === 0 ? (
                 <p className="rounded-[20px] border border-dashed border-slate-200 bg-slate-50 px-4 py-8 text-center text-sm text-slate-500">
-                  {canPurchasingAct ? "ยังไม่มี vendor proposal" : "ยังไม่มี vendor ที่ถูกส่งมาให้อนุมัติ"}
+                  {canPurchasingAct ? "ยังไม่มี Vendor proposal" : "ยังไม่มี Vendor ที่ส่งมาเพื่ออนุมัติ"}
                 </p>
               ) : (
                 (canPurchasingAct ? purchaseOrder.vendorProposals : submittedProposals).map((proposal) => (
@@ -211,15 +239,15 @@ export function VendorProposalActionPage({ poId }: { poId: string }) {
                               onChange={() => toggleSelectedProposal(proposal.id)}
                               className="h-4 w-4 rounded border-slate-300 text-[#007946]"
                             />
-                            ส่ง vendor นี้ให้ approver
+                            ส่ง Vendor นี้ให้ผู้อนุมัติ
                           </label>
                         ) : null}
                         <p className="mt-3 text-lg font-semibold text-slate-900">{proposal.vendorName}</p>
-                        <p className="mt-1 text-sm text-slate-500">Lead time: {proposal.leadTime} • Terms: {proposal.paymentTerms}</p>
+                        <p className="mt-1 text-sm text-slate-500">Lead time: {proposal.leadTime} • Payment terms: {proposal.paymentTerms}</p>
                         <p className="mt-2 text-sm text-slate-600">{proposal.notes}</p>
                         {proposal.attachmentName ? (
                           <p className="mt-2 text-sm text-sky-700">
-                            Attachment: {proposal.attachmentName}
+                            เอกสารแนบ: {proposal.attachmentName}
                             {proposal.attachmentUrl ? ` (${proposal.attachmentUrl})` : ""}
                           </p>
                         ) : null}
@@ -243,8 +271,8 @@ export function VendorProposalActionPage({ poId }: { poId: string }) {
                             </button>
                           </div>
                         ) : purchaseOrder.procurementStatus === "Pending Vendor Approval" ? (
-                          <button type="button" onClick={() => void approveVendorSelection(purchaseOrder.id, proposal.id, approvalComment)} className="inline-flex h-10 items-center rounded-xl bg-[#007946] px-4 text-sm font-semibold text-white transition hover:bg-[#005f37]">
-                            Confirm Vendor
+                          <button type="button" onClick={() => setConfirmingProposalId(proposal.id)} className="inline-flex h-10 items-center rounded-xl bg-[#007946] px-4 text-sm font-semibold text-white transition hover:bg-[#005f37]">
+                            ยืนยัน Vendor
                           </button>
                         ) : null}
                       </div>
@@ -258,18 +286,18 @@ export function VendorProposalActionPage({ poId }: { poId: string }) {
 
         <aside className="space-y-6">
           <div className="rounded-[24px] border border-slate-200 bg-white p-6 shadow-sm shadow-slate-200/50">
-            <h2 className="text-lg font-semibold text-slate-900">Selection Summary</h2>
+            <h2 className="text-lg font-semibold text-slate-900">สรุปการคัดเลือก</h2>
             <div className="mt-5 space-y-4">
               <div className="rounded-[20px] border border-slate-200 bg-slate-50 p-4">
-                <p className="text-sm text-slate-500">Submitted to Approver</p>
+                <p className="text-sm text-slate-500">ส่งให้ผู้อนุมัติแล้ว</p>
                 <p className="mt-2 text-2xl font-semibold text-slate-900">{submittedProposals.length}</p>
               </div>
               <div className="rounded-[20px] border border-slate-200 bg-slate-50 p-4">
-                <p className="text-sm text-slate-500">Total Options</p>
+                <p className="text-sm text-slate-500">ตัวเลือกทั้งหมด</p>
                 <p className="mt-2 text-2xl font-semibold text-slate-900">{purchaseOrder.vendorProposals.length}</p>
               </div>
               <div className="rounded-[20px] border border-slate-200 bg-slate-50 p-4">
-                <p className="text-sm text-slate-500">Current Status</p>
+                <p className="text-sm text-slate-500">Status ปัจจุบัน</p>
                 <div className="mt-2"><StatusBadge label={purchaseOrder.procurementStatus} /></div>
               </div>
             </div>
@@ -277,32 +305,32 @@ export function VendorProposalActionPage({ poId }: { poId: string }) {
 
           {canPurchasingAct ? (
             <div className="rounded-[24px] border border-slate-200 bg-white p-6 shadow-sm shadow-slate-200/50">
-              <h2 className="text-lg font-semibold text-slate-900">Send to Approver</h2>
-              <p className="mt-2 text-sm text-slate-500">เลือก vendor ที่ต้องการส่งต่อ แล้วกดยืนยันเพื่อเปลี่ยนสถานะเป็น Pending Vendor Approval</p>
+              <h2 className="text-lg font-semibold text-slate-900">ส่งให้ผู้อนุมัติ</h2>
+              <p className="mt-2 text-sm text-slate-500">เลือก Vendor ที่ต้องการส่งต่อ แล้วกดยืนยันเพื่อเปลี่ยนสถานะเป็น Pending Vendor Approval</p>
               <button
                 type="button"
                 onClick={handleConfirmSelected}
                 disabled={selectedProposalIds.length === 0}
-                className="mt-4 inline-flex h-10 w-full items-center justify-center rounded-xl bg-slate-900 px-4 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300"
+                className="mt-4 inline-flex h-10 w-full items-center justify-center rounded-xl bg-[#007946] px-4 text-sm font-semibold text-white transition hover:bg-[#005f37] disabled:cursor-not-allowed disabled:bg-slate-300"
               >
-                Confirm Selected Vendors
+                ยืนยัน Vendor ที่เลือก
               </button>
             </div>
           ) : (
             <div className="rounded-[24px] border border-slate-200 bg-white p-6 shadow-sm shadow-slate-200/50">
-              <h2 className="text-lg font-semibold text-slate-900">Approval Comment</h2>
+              <h2 className="text-lg font-semibold text-slate-900">หมายเหตุการอนุมัติ</h2>
               <textarea
                 value={approvalComment}
                 onChange={(event) => setApprovalComment(event.target.value)}
                 rows={5}
-                placeholder="หมายเหตุประกอบการยืนยัน vendor"
+                placeholder="ระบุหมายเหตุประกอบการยืนยัน Vendor"
                 className="mt-4 w-full rounded-[20px] border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900"
               />
             </div>
           )}
 
           <div className="rounded-[24px] border border-slate-200 bg-white p-6 shadow-sm shadow-slate-200/50">
-            <h2 className="text-lg font-semibold text-slate-900">History</h2>
+            <h2 className="text-lg font-semibold text-slate-900">ประวัติรายการ</h2>
             <div className="mt-4 space-y-3">
               {purchaseOrder.history.slice().reverse().map((entry, index) => (
                 <div key={`${entry.id}-${entry.date}-${entry.action}-${entry.actorId}-${index}`} className="rounded-[20px] border border-slate-200 bg-slate-50 p-4">
@@ -318,6 +346,27 @@ export function VendorProposalActionPage({ poId }: { poId: string }) {
           </div>
         </aside>
       </div>
+      <ConfirmModal
+        open={Boolean(confirmingProposalId)}
+        title="ยืนยันการเลือก Vendor?"
+        description="กรุณาตรวจสอบข้อมูล Vendor ก่อนยืนยัน เมื่อยืนยันแล้วระบบจะดำเนินการต่อไปยังขั้นตอน PO"
+        cancelLabel="ยกเลิก"
+        confirmLabel="ยืนยัน Vendor"
+        onCancel={() => setConfirmingProposalId(null)}
+        onConfirm={() => {
+          void handleApproveVendor();
+        }}
+      />
+      <SuccessModal
+        open={successModal.open}
+        title={successModal.title}
+        description={successModal.description}
+        buttonLabel="ไปที่ My Requests"
+        onClose={() => {
+          setSuccessModal({ open: false, title: "", description: "" });
+          router.push("/my-requests");
+        }}
+      />
     </div>
   );
 }

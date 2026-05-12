@@ -4,6 +4,7 @@ import { startTransition, useState } from "react";
 import { Eye, EyeOff, LockKeyhole, Sparkles, UserCircle2, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { mockAccounts } from "@/lib/mock-auth";
+import { getRoleLabel } from "@/lib/ui-text";
 import { useProcurementStore } from "@/store/useProcurementStore";
 
 export default function LoginPage() {
@@ -66,20 +67,17 @@ export default function LoginPage() {
             <div className="mt-16 max-w-xl lg:mt-24">
               <p className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-4 py-2 text-sm font-medium backdrop-blur-sm">
                 <Sparkles className="h-4 w-4" />
-                Mock login สำหรับเดโมภายใน
+                Mock Login สำหรับเดโมภายใน
               </p>
               <h1 className="mt-7 text-5xl font-bold leading-[1.05] tracking-tight sm:text-6xl">
                 Procurement System
-                <br />
-                
               </h1>
               <p className="mt-6 max-w-lg text-lg leading-8 text-white/82">
-                ระบบติดตามคำขอจัดซื้อ อนุมัติ รับของ และจ่ายเงินในองค์กร
+                ระบบติดตามคำขอจัดซื้อ การอนุมัติ การรับสินค้า และการชำระเงินสำหรับกระบวนการ Procure-to-Pay
               </p>
             </div>
 
             <div className="mt-auto space-y-5 pt-12">
-
               <p className="text-sm text-white/65">© 2026 HaadThip Public Company Limited</p>
             </div>
           </div>
@@ -91,8 +89,8 @@ export default function LoginPage() {
 
           <div className="relative z-10 w-full max-w-[27rem] rounded-[32px] border border-[#d9e4dc] bg-white/92 p-7 shadow-[0_28px_70px_rgba(15,23,42,0.12)] backdrop-blur-sm sm:p-9">
             <div className="text-center">
-              <h2 className="text-4xl font-bold tracking-tight text-slate-900">เข้าสู่ระบบ</h2>
-              <p className="mt-3 text-base leading-7 text-slate-500">กรุณากรอกชื่อผู้ใช้และรหัสผ่านเพื่อเข้าใช้งานระบบจำลอง</p>
+              <h2 className="text-4xl font-bold tracking-tight text-slate-900">Login</h2>
+              <p className="mt-3 text-base leading-7 text-slate-500">กรุณากรอกชื่อผู้ใช้และรหัสผ่านเพื่อเข้าใช้งานระบบเดโม</p>
             </div>
 
             <form className="mt-8 space-y-5" onSubmit={handleSubmit}>
@@ -145,7 +143,7 @@ export default function LoginPage() {
                 disabled={isSubmitting}
                 className="flex h-14 w-full items-center justify-center rounded-[18px] bg-[linear-gradient(90deg,#007946_0%,#149b74_100%)] px-4 text-lg font-semibold text-white shadow-[0_16px_36px_rgba(0,121,70,0.28)] hover:brightness-[1.02] disabled:cursor-not-allowed disabled:opacity-70"
               >
-                {isSubmitting ? "กำลังเข้าสู่ระบบ..." : "เข้าสู่ระบบ"}
+                {isSubmitting ? "กำลังเข้าสู่ระบบ..." : "Login"}
               </button>
             </form>
 
@@ -175,9 +173,9 @@ export default function LoginPage() {
                   <UserCircle2 className="h-7 w-7" />
                 </div>
                 <div>
-                  <h3 className="text-3xl font-bold tracking-tight text-slate-900">บัญชีผู้ใช้งานทดสอบ</h3>
+                  <h3 className="text-3xl font-bold tracking-tight text-slate-900">บัญชีผู้ใช้ทดสอบ</h3>
                   <p className="mt-2 text-base leading-7 text-slate-500">
-                    เลือกบัญชีเพื่อเข้าสู่ระบบทันที หรือใช้ข้อมูลด้านล่างกรอกเองในฟอร์มล็อกอิน
+                    เลือกบัญชีเพื่อเข้าใช้งานทันที หรือใช้ข้อมูลด้านล่างกรอกในฟอร์ม Login
                   </p>
                 </div>
               </div>
@@ -217,7 +215,7 @@ export default function LoginPage() {
                     </div>
                     <div>
                       <p className="text-xl font-bold text-slate-900">{account.labelTh}</p>
-                      <p className="mt-1 text-sm text-slate-500">{account.role}</p>
+                      <p className="mt-1 text-sm text-slate-500">{getRoleLabel(account.role)}</p>
                     </div>
                   </div>
 
