@@ -37,7 +37,7 @@ export default function PaymentPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Payment" subtitle="ติดตามความพร้อมในการจ่ายเงินและการจับคู่ข้อมูลใบสั่งซื้อ" />
+      <PageHeader title="จ่ายเงิน" subtitle="ติดตามความพร้อมในการจ่ายเงินและการจับคู่ข้อมูลใบสั่งซื้อ" />
       <div className="grid gap-6 xl:grid-cols-[1fr_1.2fr]">
         <div className="rounded-[24px] border border-slate-200 bg-white p-5 shadow-sm shadow-slate-200/50 sm:p-6">
           <h2 className="text-lg font-semibold text-slate-900">รายการ Payment</h2>

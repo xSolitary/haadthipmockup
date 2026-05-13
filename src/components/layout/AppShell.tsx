@@ -4,16 +4,26 @@ import { ReactNode, useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { Topbar } from "@/components/layout/Topbar";
+import { loadFromStorage, saveToStorage } from "@/lib/storage";
 import { useProcurementStore } from "@/store/useProcurementStore";
 
 interface AppShellProps {
   children: ReactNode;
 }
 
+const SIDEBAR_COLLAPSED_STORAGE_KEY = "ht-sidebar-collapsed";
+
 export function AppShell({ children }: AppShellProps) {
   const pathname = usePathname();
   const router = useRouter();
   const [hasHydrated, setHasHydrated] = useState(() => useProcurementStore.persist.hasHydrated());
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
+    if (typeof window === "undefined") {
+      return false;
+    }
+
+    return loadFromStorage<boolean>(SIDEBAR_COLLAPSED_STORAGE_KEY, false);
+  });
   const isAuthenticated = useProcurementStore((state) => state.isAuthenticated);
   const initializeData = useProcurementStore((state) => state.initializeData);
   const isLoginRoute = pathname === "/login";
@@ -25,6 +35,10 @@ export function AppShell({ children }: AppShellProps) {
 
     return unsubscribe;
   }, []);
+
+  useEffect(() => {
+    saveToStorage(SIDEBAR_COLLAPSED_STORAGE_KEY, isSidebarCollapsed);
+  }, [isSidebarCollapsed]);
 
   useEffect(() => {
     if (!hasHydrated) {
@@ -64,7 +78,10 @@ export function AppShell({ children }: AppShellProps) {
   return (
     <div className="min-h-screen bg-[var(--background)] text-slate-900">
       <div className="flex min-h-screen">
-        <Sidebar />
+        <Sidebar
+          isCollapsed={isSidebarCollapsed}
+          onToggleCollapse={() => setIsSidebarCollapsed((collapsed) => !collapsed)}
+        />
         <div className="flex min-h-screen flex-1 flex-col">
           <Topbar />
           <main className="flex-1 px-4 py-5 sm:px-6 lg:px-7 xl:px-8">

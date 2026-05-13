@@ -10,7 +10,7 @@ function parseTab(value: string | string[] | undefined): RequestTab {
   return "memo";
 }
 
-export default async function MyRequestsPage(props: PageProps<"/my-requests">) {
+export default async function ProcureToPayRoutePage(props: PageProps<"/procure-to-pay">) {
   const searchParams = await props.searchParams;
   const initialTab = parseTab(searchParams.tab);
   return <ProcureToPayPage key={initialTab} initialTab={initialTab} />;

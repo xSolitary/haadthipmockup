@@ -1,8 +1,8 @@
-"use client";
+﻿"use client";
 
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Download, Eye, Pencil, Plus, Search, X } from "lucide-react";
 import { DataTable } from "@/components/ui/DataTable";
 import { PageHeader } from "@/components/ui/PageHeader";
@@ -17,6 +17,10 @@ type DetailState =
   | { type: "pr"; id: string }
   | { type: "po"; id: string }
   | null;
+type PreviewState =
+  | { type: "pr"; id: string }
+  | { type: "po"; id: string }
+  | null;
 
 const formatCurrency = (value: number) =>
   new Intl.NumberFormat("th-TH", { style: "currency", currency: "THB", maximumFractionDigits: 0 }).format(value);
@@ -28,6 +32,15 @@ const poStatuses: PurchaseOrder["procurementStatus"][] = [
   "Received",
   "QC Passed",
 ];
+
+const dashboardShellClass = "rounded-[30px] border border-[var(--border)] bg-[var(--surface)] shadow-[var(--shadow-sm)]";
+const dashboardInnerCardClass = "rounded-[22px] border border-[var(--border)] bg-[var(--surface-strong)] shadow-[var(--shadow-sm)]";
+const dashboardControlClass =
+  "h-11 rounded-[18px] border border-[var(--border)] bg-[var(--surface)] text-sm text-slate-700 shadow-[var(--shadow-sm)] transition focus:outline-none focus:ring-0";
+const mockSuccessText = {
+  pr: "\u0e14\u0e32\u0e27\u0e19\u0e4c\u0e42\u0e2b\u0e25\u0e14 PR \u0e2a\u0e33\u0e40\u0e23\u0e47\u0e08 (Mock)",
+  po: "\u0e14\u0e32\u0e27\u0e19\u0e4c\u0e42\u0e2b\u0e25\u0e14 PO \u0e2a\u0e33\u0e40\u0e23\u0e47\u0e08 (Mock)",
+} as const;
 
 function SummaryTabCard({
   active,
@@ -46,10 +59,10 @@ function SummaryTabCard({
     <button
       type="button"
       onClick={onClick}
-      className={`relative flex h-[80px] w-full items-start justify-between overflow-hidden rounded-xl border px-4 py-3 text-left transition ${
+      className={`relative flex min-h-[88px] w-full items-start justify-between overflow-hidden rounded-[24px] border px-5 py-4 text-left transition ${
         active
-          ? "border-[#007946]/30 bg-[linear-gradient(180deg,#ffffff_0%,#f4fbf7_100%)] shadow-[0_10px_24px_rgba(15,23,42,0.06)]"
-          : "border-slate-200 bg-white shadow-[0_6px_18px_rgba(15,23,42,0.04)] hover:border-[#007946]/20 hover:bg-[#fbfdfc]"
+          ? "border-[#007946]/20 bg-[var(--surface-tint)] shadow-[var(--shadow-sm)]"
+          : "border-[var(--border)] bg-[var(--surface)] shadow-[var(--shadow-sm)] hover:border-[#007946]/20 hover:bg-[var(--surface-strong)]"
       }`}
     >
       <span className={`absolute inset-x-0 top-0 h-1 ${active ? "bg-[#007946]" : "bg-transparent"}`} />
@@ -66,7 +79,7 @@ function SummaryTabCard({
         </div>
         <p className="mt-2 text-xs text-slate-500">{count} รายการ</p>
       </div>
-      <div className={`mt-0.5 h-8 w-8 rounded-lg border ${active ? "border-[#cce5d7] bg-[#f3fbf7]" : "border-slate-200 bg-slate-50"}`} />
+      <div className={`mt-0.5 h-9 w-9 rounded-2xl border ${active ? "border-[#cfe1d7] bg-[#f4fbf7]" : "border-[var(--border)] bg-[var(--surface-strong)]"}`} />
     </button>
   );
 }
@@ -82,18 +95,18 @@ function DetailModal({
 }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/32 p-4 backdrop-blur-sm">
-      <div className="max-h-[92vh] w-full max-w-5xl overflow-hidden rounded-xl border border-slate-200 bg-white shadow-[0_24px_64px_rgba(15,23,42,0.14)]">
-        <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
+      <div className={`max-h-[92vh] w-full max-w-5xl overflow-hidden ${dashboardShellClass} shadow-[var(--shadow-md)]`}>
+        <div className="flex items-center justify-between border-b border-[var(--border)] px-5 py-4 sm:px-6">
           <h2 className="text-lg font-semibold text-slate-900">{title}</h2>
           <button
             type="button"
             onClick={onClose}
-            className="rounded-lg border border-slate-200 p-2 text-slate-500 transition hover:border-slate-300 hover:bg-slate-50 hover:text-slate-900"
+            className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-2 text-slate-500 transition hover:border-[#007946]/20 hover:bg-[var(--surface-strong)] hover:text-[var(--primary)]"
           >
             <X className="h-4 w-4" />
           </button>
         </div>
-        <div className="max-h-[calc(92vh-72px)] overflow-y-auto px-5 py-5">{children}</div>
+        <div className="max-h-[calc(92vh-72px)] overflow-y-auto px-5 py-5 sm:px-6">{children}</div>
       </div>
     </div>
   );
@@ -101,7 +114,7 @@ function DetailModal({
 
 function InfoCard({ label, value }: { label: string; value: ReactNode }) {
   return (
-    <div className="rounded-xl border border-slate-200 bg-slate-50/80 p-4">
+    <div className={`${dashboardInnerCardClass} p-4`}>
       <p className="text-xs text-slate-500">{label}</p>
       <div className="mt-1.5 font-semibold text-slate-900">{value}</div>
     </div>
@@ -113,7 +126,7 @@ function ActionIconLink({ href, icon, title }: { href: string; icon: ReactNode; 
     <Link
       href={href}
       title={title}
-      className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 transition hover:border-[#007946]/25 hover:bg-[#f4fbf7] hover:text-[#007946]"
+      className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-[var(--border)] bg-[var(--surface)] text-slate-600 shadow-[var(--shadow-sm)] transition hover:border-[#007946]/25 hover:bg-[var(--surface-tint)] hover:text-[#007946]"
     >
       {icon}
     </Link>
@@ -126,10 +139,239 @@ function ActionIconButton({ onClick, icon, title }: { onClick: () => void; icon:
       type="button"
       onClick={onClick}
       title={title}
-      className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 transition hover:border-[#007946]/25 hover:bg-[#f4fbf7] hover:text-[#007946]"
+      className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-[var(--border)] bg-[var(--surface)] text-slate-600 shadow-[var(--shadow-sm)] transition hover:border-[#007946]/25 hover:bg-[var(--surface-tint)] hover:text-[#007946]"
     >
       {icon}
     </button>
+  );
+}
+
+function PreviewField({ label, value, align = "left" }: { label: string; value: ReactNode; align?: "left" | "right" }) {
+  return (
+    <div className={align === "right" ? "text-right" : ""}>
+      <p className="text-[11px] uppercase tracking-[0.18em] text-slate-400">{label}</p>
+      <div className="mt-1 text-sm font-semibold text-slate-900">{value}</div>
+    </div>
+  );
+}
+
+function PreviewModal({
+  title,
+  onClose,
+  onDownload,
+  downloadLabel,
+  children,
+}: {
+  title: string;
+  onClose: () => void;
+  onDownload: () => void;
+  downloadLabel: string;
+  children: ReactNode;
+}) {
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        onClose();
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [onClose]);
+
+  return (
+    <div
+      className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/42 p-4 backdrop-blur-md"
+      onClick={onClose}
+      role="dialog"
+      aria-modal="true"
+      aria-label={title}
+    >
+      <div
+        className="max-h-[92vh] w-full max-w-5xl overflow-hidden rounded-[32px] border border-white/70 bg-[rgba(249,251,250,0.96)] shadow-[0_32px_90px_rgba(15,23,42,0.28)]"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div className="flex items-center justify-between border-b border-[#dbe8e0] bg-[linear-gradient(135deg,rgba(0,121,70,0.14),rgba(255,255,255,0.78))] px-5 py-4 sm:px-6">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[#007946]">Document Preview</p>
+            <h2 className="mt-1 text-lg font-semibold text-slate-900">{title}</h2>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-2xl border border-[#cfe1d7] bg-white/90 p-2 text-slate-500 transition hover:border-[#007946]/30 hover:text-[#007946]"
+            aria-label="Close preview"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        <div className="max-h-[calc(92vh-154px)] overflow-y-auto bg-[radial-gradient(circle_at_top,_rgba(0,121,70,0.08),_transparent_42%)] px-4 py-4 sm:px-6 sm:py-5">
+          {children}
+        </div>
+
+        <div className="flex flex-col-reverse gap-3 border-t border-[#dbe8e0] bg-white/92 px-5 py-4 sm:flex-row sm:justify-end sm:px-6">
+          <button
+            type="button"
+            onClick={onClose}
+            className="inline-flex h-11 items-center justify-center rounded-[18px] border border-[#d7e4dc] bg-white px-4 text-sm font-semibold text-slate-700 transition hover:border-[#007946]/25 hover:text-[#007946]"
+          >
+            Close
+          </button>
+          <button
+            type="button"
+            onClick={onDownload}
+            className="inline-flex h-11 items-center justify-center gap-2 rounded-[18px] bg-[#007946] px-4 text-sm font-semibold text-white shadow-[0_14px_24px_rgba(0,121,70,0.22)] transition hover:bg-[#00653b]"
+          >
+            <Download className="h-4 w-4" />
+            {downloadLabel}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function PrDocumentPreview({ purchaseOrder, memo }: { purchaseOrder: PurchaseOrder; memo: MemoRequest | null }) {
+  const items = memo?.items ?? [];
+
+  return (
+    <div className="rounded-[28px] border border-[#dbe8e0] bg-white p-4 shadow-[0_20px_44px_rgba(15,23,42,0.12)] sm:p-6">
+      <div className="rounded-[24px] border border-[#d7e4dc] bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(245,249,247,0.98))] p-5 sm:p-7">
+        <div className="flex flex-col gap-6 border-b border-dashed border-[#c9d8cf] pb-5 lg:flex-row lg:items-start lg:justify-between">
+          <div className="space-y-4">
+            <div>
+              <p className="text-sm font-semibold text-[#007946]">HaadThip Public Company Limited</p>
+              <p className="mt-1 text-xs text-slate-500">Purchase Request document preview</p>
+            </div>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <PreviewField label="Document No" value={purchaseOrder.prNumber ?? purchaseOrder.documentNumber} />
+              <PreviewField label="Requester" value={memo?.requesterName ?? "-"} />
+              <PreviewField label="Department" value={memo?.department ?? "-"} />
+              <PreviewField
+                label="Status"
+                value={<StatusBadge label={purchaseOrder.procurementStatus} className="min-h-7 min-w-0 px-2.5 text-[11px]" />}
+              />
+            </div>
+          </div>
+
+          <div className="rounded-[22px] border border-[#d7e4dc] bg-[#f6fbf8] px-5 py-4 text-center lg:min-w-[230px]">
+            <p className="text-xs uppercase tracking-[0.24em] text-slate-400">Purchase Request</p>
+            <p className="mt-2 text-2xl font-semibold tracking-[0.08em] text-slate-900">PR</p>
+            <p className="mt-3 text-xs text-slate-500">{memo?.requestDate ?? purchaseOrder.createdAt.slice(0, 10)}</p>
+          </div>
+        </div>
+
+        <div className="mt-6 overflow-hidden rounded-[24px] border border-[#d7e4dc]">
+          <table className="min-w-full border-collapse text-sm">
+            <thead className="bg-[#eef7f1] text-slate-700">
+              <tr>
+                <th className="border-b border-[#d7e4dc] px-4 py-3 text-left font-semibold">Item</th>
+                <th className="border-b border-[#d7e4dc] px-4 py-3 text-right font-semibold">Qty</th>
+                <th className="border-b border-[#d7e4dc] px-4 py-3 text-left font-semibold">Unit</th>
+                <th className="border-b border-[#d7e4dc] px-4 py-3 text-right font-semibold">Unit Price</th>
+                <th className="border-b border-[#d7e4dc] px-4 py-3 text-right font-semibold">Amount</th>
+              </tr>
+            </thead>
+            <tbody className="bg-white">
+              {items.map((item) => (
+                <tr key={item.id} className="border-b border-[#edf3ef] last:border-b-0">
+                  <td className="px-4 py-3 text-slate-900">{item.name}</td>
+                  <td className="px-4 py-3 text-right text-slate-700">{item.quantity.toLocaleString()}</td>
+                  <td className="px-4 py-3 text-slate-700">{item.unit}</td>
+                  <td className="px-4 py-3 text-right text-slate-700">{formatCurrency(item.unitPrice)}</td>
+                  <td className="px-4 py-3 text-right font-semibold text-slate-900">
+                    {formatCurrency(item.quantity * item.unitPrice)}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+            <tfoot className="bg-[#f8fbf9]">
+              <tr>
+                <td colSpan={4} className="px-4 py-3 text-right text-sm font-semibold text-slate-700">
+                  Total Amount
+                </td>
+                <td className="px-4 py-3 text-right text-base font-semibold text-[#007946]">
+                  {formatCurrency(memo?.estimatedTotal ?? purchaseOrder.amount)}
+                </td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function PoDocumentPreview({ purchaseOrder, memo }: { purchaseOrder: PurchaseOrder; memo: MemoRequest | null }) {
+  const items = memo?.items ?? [];
+  const selectedProposal =
+    purchaseOrder.vendorProposals.find((proposal) => proposal.vendorName === purchaseOrder.selectedVendorName) ??
+    purchaseOrder.vendorProposals[0];
+
+  return (
+    <div className="rounded-[28px] border border-[#dbe8e0] bg-white p-4 shadow-[0_20px_44px_rgba(15,23,42,0.12)] sm:p-6">
+      <div className="rounded-[24px] border border-[#d7e4dc] bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(247,250,248,0.98))] p-5 sm:p-7">
+        <div className="flex flex-col gap-6 border-b border-dashed border-[#c9d8cf] pb-5 xl:flex-row xl:items-start xl:justify-between">
+          <div className="space-y-4">
+            <div>
+              <p className="text-sm font-semibold text-[#007946]">HaadThip Public Company Limited</p>
+              <p className="mt-1 text-xs text-slate-500">Purchase Order document preview</p>
+            </div>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <PreviewField label="PO No" value={purchaseOrder.poNumber ?? purchaseOrder.documentNumber} />
+              <PreviewField label="Vendor" value={purchaseOrder.selectedVendorName ?? purchaseOrder.vendorName} />
+              <PreviewField label="Delivery Address" value={memo?.deliveryLocation ?? "-"} />
+              <PreviewField label="Payment Term" value={selectedProposal?.paymentTerms ?? "-"} />
+            </div>
+          </div>
+
+          <div className="grid gap-4 rounded-[22px] border border-[#d7e4dc] bg-[#f6fbf8] px-5 py-4 xl:min-w-[260px]">
+            <PreviewField label="Total Amount" value={<span className="text-lg text-[#007946]">{formatCurrency(purchaseOrder.amount)}</span>} align="right" />
+            <PreviewField label="PR Ref" value={purchaseOrder.prNumber ?? purchaseOrder.documentNumber} align="right" />
+            <PreviewField label="Issue Date" value={purchaseOrder.updatedAt.slice(0, 10)} align="right" />
+          </div>
+        </div>
+
+        <div className="mt-6 overflow-hidden rounded-[24px] border border-[#d7e4dc]">
+          <table className="min-w-full border-collapse text-sm">
+            <thead className="bg-[#eef7f1] text-slate-700">
+              <tr>
+                <th className="border-b border-[#d7e4dc] px-4 py-3 text-left font-semibold">Item</th>
+                <th className="border-b border-[#d7e4dc] px-4 py-3 text-right font-semibold">Qty</th>
+                <th className="border-b border-[#d7e4dc] px-4 py-3 text-left font-semibold">Unit</th>
+                <th className="border-b border-[#d7e4dc] px-4 py-3 text-right font-semibold">Amount</th>
+                <th className="border-b border-[#d7e4dc] px-4 py-3 text-left font-semibold">Remark</th>
+              </tr>
+            </thead>
+            <tbody className="bg-white">
+              {items.map((item) => (
+                <tr key={item.id} className="border-b border-[#edf3ef] last:border-b-0">
+                  <td className="px-4 py-3 text-slate-900">{item.name}</td>
+                  <td className="px-4 py-3 text-right text-slate-700">{item.quantity.toLocaleString()}</td>
+                  <td className="px-4 py-3 text-slate-700">{item.unit}</td>
+                  <td className="px-4 py-3 text-right font-semibold text-slate-900">
+                    {formatCurrency(item.quantity * item.unitPrice)}
+                  </td>
+                  <td className="px-4 py-3 text-slate-500">{selectedProposal?.leadTime ? `Lead time ${selectedProposal.leadTime}` : "-"}</td>
+                </tr>
+              ))}
+            </tbody>
+            <tfoot className="bg-[#f8fbf9]">
+              <tr>
+                <td colSpan={3} className="px-4 py-3 text-right text-sm font-semibold text-slate-700">
+                  Total Amount
+                </td>
+                <td className="px-4 py-3 text-right text-base font-semibold text-[#007946]">
+                  {formatCurrency(purchaseOrder.amount)}
+                </td>
+                <td className="px-4 py-3 text-slate-500">{selectedProposal?.notes ?? "-"}</td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -174,6 +416,7 @@ export function ProcureToPayPage({ initialTab = "memo" }: { initialTab?: Procure
 
   const [activeTab, setActiveTab] = useState<ProcureTab>(initialTab);
   const [detailState, setDetailState] = useState<DetailState>(null);
+  const [previewState, setPreviewState] = useState<PreviewState>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
 
@@ -192,7 +435,7 @@ export function ProcureToPayPage({ initialTab = "memo" }: { initialTab?: Procure
           if (memo.status === "Pending Approval") {
             return memo.requesterId === currentUserId || memo.assignedApproverId === currentUserId;
           }
-          if (memo.status === "Draft" || memo.status === "Revision Required") {
+          if (memo.status === "Draft" || memo.status === "Revision Required" || memo.status === "Rejected") {
             return memo.requesterId === currentUserId;
           }
           return false;
@@ -233,6 +476,8 @@ export function ProcureToPayPage({ initialTab = "memo" }: { initialTab?: Procure
   const selectedMemo = detailState?.type === "memo" ? memos.find((memo) => memo.id === detailState.id) ?? null : null;
   const selectedPr = detailState?.type === "pr" ? purchaseOrders.find((po) => po.id === detailState.id) ?? null : null;
   const selectedPo = detailState?.type === "po" ? purchaseOrders.find((po) => po.id === detailState.id) ?? null : null;
+  const previewPr = previewState?.type === "pr" ? purchaseOrders.find((po) => po.id === previewState.id) ?? null : null;
+  const previewPo = previewState?.type === "po" ? purchaseOrders.find((po) => po.id === previewState.id) ?? null : null;
 
   const memoPendingCount = useMemo(
     () => memos.filter((memo) => memo.status === "Pending Approval").length,
@@ -313,6 +558,14 @@ export function ProcureToPayPage({ initialTab = "memo" }: { initialTab?: Procure
     setDetailState(null);
   };
 
+  const openPreview = (type: "pr" | "po", id: string) => {
+    setPreviewState({ type, id });
+  };
+
+  const closePreview = () => {
+    setPreviewState(null);
+  };
+
   const switchTab = (tab: ProcureTab) => {
     setActiveTab(tab);
     setSearchTerm("");
@@ -346,13 +599,13 @@ export function ProcureToPayPage({ initialTab = "memo" }: { initialTab?: Procure
   return (
     <div className="space-y-4">
       <PageHeader
-        title="Procure-to-Pay"
+        title="ระบบจัดซื้อจัดจ้าง"
         subtitle="รวม Memo, PR และ PO ในกระบวนการจัดซื้อ"
-        className="rounded-xl px-5 py-5 shadow-[0_10px_24px_rgba(15,23,42,0.05)]"
+        className="px-5 py-6 sm:px-6"
         contentClassName="gap-3"
       />
 
-      <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-[0_12px_32px_rgba(15,23,42,0.05)] sm:p-5">
+      <section className={`${dashboardShellClass} p-4 sm:p-5`}>
         <div className="grid gap-3 md:grid-cols-3">
           {visibleTabs.map((tab) => (
             <SummaryTabCard
@@ -366,7 +619,7 @@ export function ProcureToPayPage({ initialTab = "memo" }: { initialTab?: Procure
           ))}
         </div>
 
-        <div className="mt-4 flex flex-col gap-3 border-t border-slate-100 pt-4 xl:flex-row xl:items-center xl:justify-between">
+        <div className={`mt-4 flex flex-col gap-3 border-t border-[var(--border)] pt-4 xl:flex-row xl:items-center xl:justify-between ${dashboardInnerCardClass} p-4`}>
           <div className="flex flex-1 flex-col gap-3 lg:flex-row">
             <label className="relative block w-full lg:max-w-sm">
               <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
@@ -374,14 +627,14 @@ export function ProcureToPayPage({ initialTab = "memo" }: { initialTab?: Procure
                 value={searchTerm}
                 onChange={(event) => setSearchTerm(event.target.value)}
                 placeholder={`ค้นหา ${currentTab.toUpperCase()}...`}
-                className="h-10 w-full rounded-xl border border-slate-200 bg-white pl-9 pr-3 text-sm text-slate-900 placeholder:text-slate-400"
+                className={`${dashboardControlClass} w-full pl-9 pr-3 text-slate-900 placeholder:text-slate-400`}
               />
             </label>
 
             <select
               value={statusFilter}
               onChange={(event) => setStatusFilter(event.target.value)}
-              className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-700 lg:w-56"
+              className={`${dashboardControlClass} w-full px-3 lg:w-56`}
             >
               <option value="all">ทุก Status</option>
               {statusOptions.map((status) => (
@@ -395,7 +648,7 @@ export function ProcureToPayPage({ initialTab = "memo" }: { initialTab?: Procure
           {canCreateMemo ? (
             <Link
               href="/memo/create"
-              className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-[#007946] px-4 text-sm font-semibold text-white shadow-sm shadow-emerald-900/10 transition hover:bg-[#00643a]"
+              className="inline-flex h-11 items-center justify-center gap-2 rounded-[18px] bg-[#007946] px-4 text-sm font-semibold text-white shadow-sm shadow-emerald-900/10 transition hover:bg-[#00643a]"
             >
               <Plus className="h-4 w-4" /> Create Memo
             </Link>
@@ -405,17 +658,17 @@ export function ProcureToPayPage({ initialTab = "memo" }: { initialTab?: Procure
         <div className="mt-4">
           {currentTab === "memo" ? (
             !hasBaseItems ? (
-              <p className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-4 py-8 text-center text-sm text-slate-500">
+              <p className="rounded-[28px] border border-dashed border-[var(--border)] bg-[var(--surface-strong)] px-4 py-8 text-center text-sm text-slate-500">
                 ยังไม่มี Memo ที่ต้องดำเนินการสำหรับ Role นี้
               </p>
             ) : filteredMemoRequests.length === 0 ? (
-              <p className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-4 py-8 text-center text-sm text-slate-500">
+              <p className="rounded-[28px] border border-dashed border-[var(--border)] bg-[var(--surface-strong)] px-4 py-8 text-center text-sm text-slate-500">
                 ไม่พบรายการที่ตรงกับคำค้นหาหรือตัวกรอง
               </p>
             ) : (
               <DataTable
                 headers={["เลขที่", "หัวข้อ", "ไซต์", "ยอดเงิน", "Status", ""]}
-                className="rounded-xl border-slate-200 shadow-none"
+                className="border-[var(--border)] shadow-[var(--shadow-sm)]"
                 headerClassName="bg-[rgba(244,249,246,0.96)]"
                 headerCellClassName="px-4 py-3 text-xs font-semibold text-slate-500"
                 bodyClassName="[&_td]:py-3"
@@ -444,17 +697,17 @@ export function ProcureToPayPage({ initialTab = "memo" }: { initialTab?: Procure
 
           {currentTab === "pr" ? (
             !hasBaseItems ? (
-              <p className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-4 py-8 text-center text-sm text-slate-500">
-                ยังไม่มี PR สำหรับ Role นี้
+              <p className="rounded-[28px] border border-dashed border-[var(--border)] bg-[var(--surface-strong)] px-4 py-8 text-center text-sm text-slate-500">
+                ยังไม่มี PR ที่ต้องดำเนินการสำหรับ Role นี้
               </p>
             ) : filteredPrItems.length === 0 ? (
-              <p className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-4 py-8 text-center text-sm text-slate-500">
+              <p className="rounded-[28px] border border-dashed border-[var(--border)] bg-[var(--surface-strong)] px-4 py-8 text-center text-sm text-slate-500">
                 ไม่พบรายการที่ตรงกับคำค้นหาหรือตัวกรอง
               </p>
             ) : (
               <DataTable
                 headers={["PR", "หัวข้อ", "ตัวเลือก Vendor", "Vendor ที่เลือก", "Status", ""]}
-                className="rounded-xl border-slate-200 shadow-none"
+                className="border-[var(--border)] shadow-[var(--shadow-sm)]"
                 headerClassName="bg-[rgba(244,249,246,0.96)]"
                 headerCellClassName="px-4 py-3 text-xs font-semibold text-slate-500"
                 bodyClassName="[&_td]:py-3"
@@ -483,17 +736,17 @@ export function ProcureToPayPage({ initialTab = "memo" }: { initialTab?: Procure
 
           {currentTab === "po" ? (
             !hasBaseItems ? (
-              <p className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-4 py-8 text-center text-sm text-slate-500">
-                ยังไม่มี PO ในช่วงนี้
+              <p className="rounded-[28px] border border-dashed border-[var(--border)] bg-[var(--surface-strong)] px-4 py-8 text-center text-sm text-slate-500">
+                ยังไม่มี PO ที่ต้องดำเนินการสำหรับ Role นี้
               </p>
             ) : filteredPoItems.length === 0 ? (
-              <p className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-4 py-8 text-center text-sm text-slate-500">
+              <p className="rounded-[28px] border border-dashed border-[var(--border)] bg-[var(--surface-strong)] px-4 py-8 text-center text-sm text-slate-500">
                 ไม่พบรายการที่ตรงกับคำค้นหาหรือตัวกรอง
               </p>
             ) : (
               <DataTable
                 headers={["PO", "หัวข้อ", "Vendor", "ยอดเงิน", "Status", ""]}
-                className="rounded-xl border-slate-200 shadow-none"
+                className="border-[var(--border)] shadow-[var(--shadow-sm)]"
                 headerClassName="bg-[rgba(244,249,246,0.96)]"
                 headerCellClassName="px-4 py-3 text-xs font-semibold text-slate-500"
                 bodyClassName="[&_td]:py-3"
@@ -542,14 +795,14 @@ export function ProcureToPayPage({ initialTab = "memo" }: { initialTab?: Procure
               <InfoCard label="สถานะจัดซื้อ" value={<StatusBadge label={selectedMemo.procurementStatus} className="min-h-7 min-w-0 px-2.5 text-[11px]" />} />
             </div>
 
-            <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+            <div className={`${dashboardInnerCardClass} p-4`}>
               <p className="font-semibold text-slate-900">วัตถุประสงค์</p>
               <p className="mt-2 text-sm text-slate-600">{selectedMemo.purpose}</p>
             </div>
 
             <DataTable
               headers={["รายการ", "หมวด", "จำนวน", "มูลค่า"]}
-              className="rounded-xl border-slate-200 shadow-none"
+              className="border-[var(--border)] shadow-[var(--shadow-sm)]"
               headerClassName="bg-[rgba(244,249,246,0.96)]"
               headerCellClassName="px-4 py-3 text-xs font-semibold text-slate-500"
               bodyClassName="[&_td]:py-3"
@@ -591,8 +844,8 @@ export function ProcureToPayPage({ initialTab = "memo" }: { initialTab?: Procure
               <InfoCard label="Vendor ที่เลือก" value={selectedPr.selectedVendorName ?? "-"} />
             </div>
 
-            <div className="rounded-xl border border-slate-200 bg-white shadow-[0_8px_20px_rgba(15,23,42,0.04)]">
-              <div className="border-b border-slate-200 px-4 py-3">
+            <div className={dashboardShellClass}>
+              <div className="border-b border-[var(--border)] px-4 py-3">
                 <p className="font-semibold text-slate-900">ตัวเลือก Vendor</p>
               </div>
               <div className="space-y-3 p-4">
@@ -600,7 +853,7 @@ export function ProcureToPayPage({ initialTab = "memo" }: { initialTab?: Procure
                   <p className="text-sm text-slate-500">ยังไม่มีการเสนอ Vendor</p>
                 ) : (
                   selectedPr.vendorProposals.map((proposal) => (
-                    <div key={proposal.id} className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                    <div key={proposal.id} className={`${dashboardInnerCardClass} p-4`}>
                       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                         <div>
                           <p className="text-base font-semibold text-slate-900">{proposal.vendorName}</p>
@@ -629,7 +882,7 @@ export function ProcureToPayPage({ initialTab = "memo" }: { initialTab?: Procure
               </div>
             </div>
 
-            <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+            <div className={`${dashboardInnerCardClass} p-4`}>
               <p className="font-semibold text-slate-900">ประวัติรายการ</p>
               <div className="mt-3 space-y-3">
                 {selectedPr.history.length === 0 ? (
@@ -639,7 +892,7 @@ export function ProcureToPayPage({ initialTab = "memo" }: { initialTab?: Procure
                     .slice()
                     .reverse()
                     .map((entry, index) => (
-                      <div key={`${entry.id}-${entry.date}-${entry.action}-${entry.actorId}-${index}`} className="rounded-xl border border-slate-200/80 bg-white p-4">
+                      <div key={`${entry.id}-${entry.date}-${entry.action}-${entry.actorId}-${index}`} className="rounded-[20px] border border-[var(--border)] bg-[var(--surface)] p-4 shadow-[var(--shadow-sm)]">
                         <div className="flex items-center justify-between gap-3">
                           <p className="font-semibold text-slate-900">{entry.actionLabelTh}</p>
                           <span className="text-xs text-slate-400">{entry.date.slice(0, 10)}</span>
@@ -652,6 +905,16 @@ export function ProcureToPayPage({ initialTab = "memo" }: { initialTab?: Procure
                     ))
                 )}
               </div>
+            </div>
+
+            <div className="flex flex-wrap gap-3">
+              <button
+                type="button"
+                onClick={() => openPreview("pr", selectedPr.id)}
+                className="inline-flex h-11 items-center gap-2 rounded-[18px] bg-slate-800 px-4 text-sm font-semibold text-white transition hover:bg-slate-900"
+              >
+                <Download className="h-4 w-4" /> Download PR
+              </button>
             </div>
           </div>
         </DetailModal>
@@ -678,7 +941,7 @@ export function ProcureToPayPage({ initialTab = "memo" }: { initialTab?: Procure
               <InfoCard label="Vendor" value={selectedPo.selectedVendorName ?? selectedPo.vendorName} />
             </div>
 
-            <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+            <div className={`${dashboardInnerCardClass} p-4`}>
               <p className="font-semibold text-slate-900">ลำดับสถานะ PO</p>
               <div className="mt-3 flex flex-wrap gap-2">
                 {["PO Created", "Sent to Vendor", "Pending Receiving", "Received", "QC Passed"].map((status) => (
@@ -699,14 +962,36 @@ export function ProcureToPayPage({ initialTab = "memo" }: { initialTab?: Procure
             <div className="flex flex-wrap gap-3">
               <button
                 type="button"
-                onClick={() => alert(`ดาวน์โหลด PO สำเร็จ (Mock)\nDocument: ${selectedPo.poNumber ?? selectedPo.documentNumber}`)}
-                className="inline-flex h-10 items-center gap-2 rounded-xl bg-slate-800 px-4 text-sm font-semibold text-white transition hover:bg-slate-900"
+                onClick={() => openPreview("po", selectedPo.id)}
+                className="inline-flex h-11 items-center gap-2 rounded-[18px] bg-slate-800 px-4 text-sm font-semibold text-white transition hover:bg-slate-900"
               >
-                <Download className="h-4 w-4" /> ดาวน์โหลด PO
+                <Download className="h-4 w-4" /> Download PO
               </button>
             </div>
           </div>
         </DetailModal>
+      ) : null}
+
+      {previewPr ? (
+        <PreviewModal
+          title="Preview PR Document"
+          downloadLabel="Download PR"
+          onClose={closePreview}
+          onDownload={() => alert(mockSuccessText.pr)}
+        >
+          <PrDocumentPreview purchaseOrder={previewPr} memo={memoById.get(previewPr.memoId) ?? null} />
+        </PreviewModal>
+      ) : null}
+
+      {previewPo ? (
+        <PreviewModal
+          title="Preview PO Document"
+          downloadLabel="Download PO"
+          onClose={closePreview}
+          onDownload={() => alert(mockSuccessText.po)}
+        >
+          <PoDocumentPreview purchaseOrder={previewPo} memo={memoById.get(previewPo.memoId) ?? null} />
+        </PreviewModal>
       ) : null}
     </div>
   );

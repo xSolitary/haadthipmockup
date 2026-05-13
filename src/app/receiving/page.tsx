@@ -49,7 +49,7 @@ export default function ReceivingPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Receiving & QC" subtitle="ติดตามการรับสินค้าจาก Vendor และสถานะการตรวจสอบคุณภาพ" />
+      <PageHeader title="ระบบตรวจรับสินค้าและตรวจสอบคุณภาพ" subtitle="ติดตามการรับสินค้าจากร้านค้าและสถานะการตรวจสอบคุณภาพ" />
       <div className="grid gap-6 xl:grid-cols-[1fr_1.2fr]">
         <div className="rounded-[24px] border border-slate-200 bg-white p-5 shadow-sm shadow-slate-200/50 sm:p-6">
           <h2 className="text-lg font-semibold text-slate-900">PO รอรับสินค้า</h2>

@@ -34,7 +34,7 @@ const statusLabelMap: Record<string, string> = {
 const roleLabelMap: Record<Role, string> = {
   Requester: "ผู้ขอซื้อ",
   Approver: "ผู้อนุมัติ",
-  Purchasing: "จัดซื้อ",
+  Purchasing: "ฝ่ายจัดซื้อ",
   Finance: "การเงิน",
   Admin: "ผู้ดูแลระบบ",
 };

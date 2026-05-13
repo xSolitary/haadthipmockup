@@ -1,16 +1,72 @@
 "use client";
 
-import { Bell, ChevronDown, LogOut, Search, UserRound } from "lucide-react";
+import Link from "next/link";
+import {
+  Bell,
+  ChevronDown,
+  CircleAlert,
+  ClipboardCheck,
+  FileWarning,
+  LogOut,
+  Search,
+  Siren,
+  UserRound,
+} from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useCurrentUserProfile } from "@/components/layout/useCurrentUserProfile";
+import { getActionNotifications, type NotificationIconKey } from "@/lib/notifications";
+import { loadFromStorage, saveToStorage } from "@/lib/storage";
+import { useProcurementStore } from "@/store/useProcurementStore";
+
+const NOTIFICATION_READ_STORAGE_KEY = "ht-notification-read-state";
+
+type NotificationReadState = Record<string, string>;
+
+function NotificationIcon({ icon }: { icon: NotificationIconKey }) {
+  switch (icon) {
+    case "revision":
+      return <FileWarning className="h-4 w-4" />;
+    case "rejected":
+      return <CircleAlert className="h-4 w-4" />;
+    case "urgent":
+      return <Siren className="h-4 w-4" />;
+    case "memo-approval":
+      return <ClipboardCheck className="h-4 w-4" />;
+    case "vendor-approval":
+      return <ClipboardCheck className="h-4 w-4" />;
+    case "vendor-proposal":
+      return <Bell className="h-4 w-4" />;
+    default:
+      return <Bell className="h-4 w-4" />;
+  }
+}
 
 export function Topbar() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isNotificationOpen, setIsNotificationOpen] = useState(false);
+  const [readState, setReadState] = useState<NotificationReadState>(() => {
+    if (typeof window === "undefined") {
+      return {};
+    }
+
+    return loadFromStorage<NotificationReadState>(NOTIFICATION_READ_STORAGE_KEY, {});
+  });
   const menuRef = useRef<HTMLDivElement>(null);
+  const notificationRef = useRef<HTMLDivElement>(null);
   const { currentUser, currentUsername, initials, roleLabel, handleLogout } = useCurrentUserProfile();
+  const currentRole = useProcurementStore((state) => state.currentRole);
+  const currentUserId = useProcurementStore((state) => state.currentUserId);
+  const memos = useProcurementStore((state) => state.memos);
+  const purchaseOrders = useProcurementStore((state) => state.purchaseOrders);
+  const notificationScopeKey = currentRole && currentUserId ? `${currentRole}:${currentUserId}` : null;
+  const clearedAt = notificationScopeKey ? readState[notificationScopeKey] : undefined;
+  const notifications = getActionNotifications({ currentRole, currentUserId, memos, purchaseOrders }).filter(
+    (notification) => !clearedAt || new Date(notification.timestamp).getTime() > new Date(clearedAt).getTime(),
+  );
+  const notificationCount = notifications.length;
 
   useEffect(() => {
-    if (!isMenuOpen) {
+    if (!isMenuOpen && !isNotificationOpen) {
       return;
     }
 
@@ -18,11 +74,15 @@ export function Topbar() {
       if (!menuRef.current?.contains(event.target as Node)) {
         setIsMenuOpen(false);
       }
+      if (!notificationRef.current?.contains(event.target as Node)) {
+        setIsNotificationOpen(false);
+      }
     };
 
     const handleEscape = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         setIsMenuOpen(false);
+        setIsNotificationOpen(false);
       }
     };
 
@@ -33,30 +93,116 @@ export function Topbar() {
       window.removeEventListener("mousedown", handlePointerDown);
       window.removeEventListener("keydown", handleEscape);
     };
-  }, [isMenuOpen]);
+  }, [isMenuOpen, isNotificationOpen]);
+
+  const handleMarkAllAsRead = () => {
+    if (!notificationScopeKey) {
+      setIsNotificationOpen(false);
+      return;
+    }
+
+    const nextState = {
+      ...readState,
+      [notificationScopeKey]: new Date().toISOString(),
+    };
+
+    setReadState(nextState);
+    saveToStorage(NOTIFICATION_READ_STORAGE_KEY, nextState);
+    setIsNotificationOpen(false);
+  };
 
   return (
     <header className="sticky top-0 z-20 border-b border-[var(--border)] bg-[rgba(245,245,239,0.88)] px-4 py-4 backdrop-blur-xl sm:px-6 lg:px-7 xl:px-8">
-      <div className="mx-auto flex w-full max-w-[1520px] items-center justify-between gap-4">
-        <div className="flex flex-1 items-center gap-3">
-          <div className="relative flex h-12 max-w-2xl flex-1 items-center rounded-[22px] border border-[var(--border)] bg-[var(--surface)] px-4 shadow-[var(--shadow-sm)]">
-            <Search className="mr-3 h-4 w-4 text-slate-400" />
+      <div className="flex w-full items-center gap-3">
+        <div className="flex-1" />
+
+        <div className="ml-auto flex min-w-0 flex-1 items-center justify-end gap-2.5" ref={menuRef}>
+          <div className="relative flex h-11 min-w-0 flex-1 items-center rounded-[20px] border border-[var(--border)] bg-[var(--surface)] px-4 shadow-[var(--shadow-sm)] sm:max-w-[220px] md:max-w-[240px] lg:max-w-[260px]">
+            <Search className="mr-3 h-4 w-4 shrink-0 text-slate-400" />
             <input
               type="search"
               placeholder="ค้นหา Memo, PO, Vendor..."
-              className="w-full border-none bg-transparent text-sm text-slate-700 placeholder:text-slate-400"
+              className="w-full min-w-0 border-none bg-transparent text-sm text-slate-700 placeholder:text-slate-400"
             />
           </div>
-          <button className="hidden h-12 w-12 items-center justify-center rounded-[20px] border border-[var(--border)] bg-[var(--surface)] text-slate-500 shadow-[var(--shadow-sm)] hover:border-[#007946]/15 hover:bg-[var(--surface-strong)] hover:text-[var(--primary)] sm:inline-flex">
-            <Bell className="h-4 w-4" />
-          </button>
-        </div>
 
-        <div className="flex items-center gap-2.5" ref={menuRef}>
-          <div className="relative">
+          <div className="relative shrink-0" ref={notificationRef}>
             <button
               type="button"
-              onClick={() => setIsMenuOpen((open) => !open)}
+              onClick={() => {
+                setIsNotificationOpen((open) => !open);
+                setIsMenuOpen(false);
+              }}
+              className="relative inline-flex h-11 w-11 items-center justify-center rounded-[20px] border border-[var(--border)] bg-[var(--surface)] text-slate-500 shadow-[var(--shadow-sm)] transition hover:border-[#007946]/15 hover:bg-[var(--surface-strong)] hover:text-[var(--primary)]"
+              aria-haspopup="dialog"
+              aria-expanded={isNotificationOpen}
+              aria-label="การแจ้งเตือน"
+            >
+              <Bell className="h-4 w-4" />
+              {notificationCount > 0 ? (
+                <span className="absolute -right-1 -top-1 inline-flex min-w-5 items-center justify-center rounded-full bg-[#d92d20] px-1.5 py-0.5 text-[10px] font-semibold leading-none text-white shadow-[0_8px_16px_rgba(217,45,32,0.25)]">
+                  {notificationCount}
+                </span>
+              ) : null}
+            </button>
+
+            {isNotificationOpen ? (
+              <div className="absolute right-0 top-[calc(100%+0.75rem)] z-30 w-[360px] max-w-[calc(100vw-2rem)] overflow-hidden rounded-[32px] border border-[#d9e8de] bg-white shadow-[0_28px_60px_rgba(15,23,42,0.16)]">
+                <div className="flex items-center justify-between border-b border-[#edf3ef] px-5 py-4">
+                  <div>
+                    <h2 className="text-base font-semibold text-slate-900">การแจ้งเตือน</h2>
+                    <p className="mt-1 text-xs text-slate-500">งานที่ต้องดำเนินการตามสิทธิ์ของคุณ</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleMarkAllAsRead}
+                    className="text-sm font-semibold text-[#007946] transition hover:text-[#005f37]"
+                  >
+                    อ่านทั้งหมด
+                  </button>
+                </div>
+
+                {notifications.length === 0 ? (
+                  <div className="px-5 py-8 text-center text-sm text-slate-500">ไม่มีงานที่ต้องดำเนินการ</div>
+                ) : (
+                  <div className="max-h-[420px] overflow-y-auto px-3 py-3">
+                    {notifications.map((notification) => (
+                      <Link
+                        key={notification.id}
+                        href={notification.href}
+                        onClick={() => setIsNotificationOpen(false)}
+                        className="flex items-start gap-3 rounded-[24px] px-3 py-3 transition hover:bg-[#f4fbf7]"
+                      >
+                        <div className="mt-0.5 flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[#eef8f2] text-[#007946]">
+                          <NotificationIcon icon={notification.icon} />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0">
+                              <p className="truncate text-sm font-semibold text-slate-900">{notification.title}</p>
+                              <p className="mt-1 line-clamp-2 text-sm leading-5 text-slate-500">
+                                {notification.description}
+                              </p>
+                            </div>
+                            <span className="mt-1 h-2.5 w-2.5 shrink-0 rounded-full bg-[#d92d20]" />
+                          </div>
+                          <p className="mt-2 text-xs font-medium text-slate-400">{notification.timeLabel}</p>
+                        </div>
+                      </Link>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ) : null}
+          </div>
+
+          <div className="relative shrink-0">
+            <button
+              type="button"
+              onClick={() => {
+                setIsMenuOpen((open) => !open);
+                setIsNotificationOpen(false);
+              }}
               className="flex min-h-12 items-center gap-3 rounded-[22px] border border-[var(--border)] bg-[var(--surface)] px-3.5 py-2.5 text-sm text-slate-700 shadow-[var(--shadow-sm)] hover:border-[#007946]/20 hover:bg-[var(--surface-strong)]"
               aria-haspopup="menu"
               aria-expanded={isMenuOpen}

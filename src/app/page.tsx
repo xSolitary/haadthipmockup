@@ -173,7 +173,7 @@ export default function DashboardPage() {
       <section className={`${cardClassName} overflow-hidden px-5 py-5 sm:px-6`}>
         <div className="flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
           <div className="max-w-3xl">
-            <p className="inline-flex rounded-full bg-[var(--surface-tint)] px-3 py-1 text-xs font-semibold tracking-[0.12em] text-[var(--primary-ink)]">Dashboard</p>
+            <p className="inline-flex rounded-full bg-[var(--surface-tint)] px-3 py-1 text-xs font-semibold tracking-[0.12em] text-[var(--primary-ink)]">แดชบอร์ด</p>
             <h1 className="mt-3 text-3xl font-bold tracking-normal text-slate-900 md:text-4xl">ภาพรวมการจัดซื้อ</h1>
             <p className="mt-2 text-sm leading-6 tracking-normal text-slate-500">
               ติดตาม KPI งานค้างและโครงสร้างการใช้จ่ายตามช่วงวันที่ที่เลือก โดยอ้างอิงข้อมูลชุดเดิมของระบบ
