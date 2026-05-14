@@ -20,10 +20,6 @@ export interface ActionNotification {
   timestamp: string;
 }
 
-function buildHref(tab: NotificationTab) {
-  return `/procure-to-pay?tab=${tab}`;
-}
-
 function getLatestTimestamp(...values: Array<string | undefined>) {
   return values.find((value) => Boolean(value)) ?? new Date(0).toISOString();
 }
@@ -71,6 +67,18 @@ function getSourceMemo(po: PurchaseOrder, memos: MemoRequest[]) {
   return memos.find((memo) => memo.id === po.memoId) ?? null;
 }
 
+function getRequesterMemoHref(memo: MemoRequest) {
+  return `/memo/${memo.id}/edit`;
+}
+
+function getApproverMemoHref(memo: MemoRequest) {
+  return `/memo/${memo.id}/action`;
+}
+
+function getVendorActionHref(po: PurchaseOrder) {
+  return `/pr-po/${po.id}/action`;
+}
+
 export function getActionNotifications(
   state: Pick<ProcurementState, "currentRole" | "currentUserId" | "memos" | "purchaseOrders">,
 ) {
@@ -92,7 +100,7 @@ export function getActionNotifications(
           title: "Memo ขอแก้ไข",
           description: `${memo.documentNumber} • ${memo.title}`,
           timeLabel: formatRelativeTime(getLatestTimestamp(memo.updatedAt, memo.history.at(-1)?.date)),
-          href: buildHref("memo"),
+          href: getRequesterMemoHref(memo),
           tab: "memo" as const,
           timestamp: getLatestTimestamp(memo.updatedAt, memo.history.at(-1)?.date),
         })),
@@ -107,7 +115,7 @@ export function getActionNotifications(
           title: "Memo ถูกปฏิเสธ",
           description: `${memo.documentNumber} • ${memo.title}`,
           timeLabel: formatRelativeTime(getLatestTimestamp(memo.updatedAt, memo.history.at(-1)?.date)),
-          href: buildHref("memo"),
+          href: getRequesterMemoHref(memo),
           tab: "memo" as const,
           timestamp: getLatestTimestamp(memo.updatedAt, memo.history.at(-1)?.date),
         })),
@@ -119,7 +127,7 @@ export function getActionNotifications(
           (memo) =>
             memo.requesterId === currentUserId &&
             (memo.urgency === "Urgent" || memo.urgency === "Emergency") &&
-            ["Draft", "Revision Required", "Rejected", "Pending Approval"].includes(memo.status),
+            ["Draft", "Revision Required", "Rejected"].includes(memo.status),
         )
         .map((memo) => ({
           id: `memo-urgent-${memo.id}`,
@@ -127,7 +135,7 @@ export function getActionNotifications(
           title: "รายการจัดซื้อเร่งด่วน",
           description: `${memo.documentNumber} • ${memo.title}`,
           timeLabel: formatRelativeTime(getLatestTimestamp(memo.updatedAt, memo.history.at(-1)?.date)),
-          href: buildHref("memo"),
+          href: getRequesterMemoHref(memo),
           tab: "memo" as const,
           timestamp: getLatestTimestamp(memo.updatedAt, memo.history.at(-1)?.date),
         })),
@@ -144,7 +152,7 @@ export function getActionNotifications(
           title: "รออนุมัติ Memo",
           description: `${memo.documentNumber} • ${memo.title}`,
           timeLabel: formatRelativeTime(getLatestTimestamp(memo.updatedAt, memo.history.at(-1)?.date)),
-          href: buildHref("memo"),
+          href: getApproverMemoHref(memo),
           tab: "memo" as const,
           timestamp: getLatestTimestamp(memo.updatedAt, memo.history.at(-1)?.date),
         })),
@@ -162,7 +170,7 @@ export function getActionNotifications(
           title: "รออนุมัติการเลือก Vendor",
           description: `${po.prNumber ?? po.documentNumber} • ${po.memoTitle}`,
           timeLabel: formatRelativeTime(po.updatedAt),
-          href: buildHref("pr"),
+          href: getVendorActionHref(po),
           tab: "pr" as const,
           timestamp: po.updatedAt,
         })),
@@ -179,7 +187,7 @@ export function getActionNotifications(
           title: "PR รอเสนอหรือคัดเลือก Vendor",
           description: `${po.prNumber ?? po.documentNumber} • ${po.memoTitle}`,
           timeLabel: formatRelativeTime(po.updatedAt),
-          href: buildHref("pr"),
+          href: getVendorActionHref(po),
           tab: "pr" as const,
           timestamp: po.updatedAt,
         })),

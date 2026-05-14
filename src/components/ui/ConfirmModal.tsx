@@ -3,7 +3,7 @@ import { CircleAlert } from "lucide-react";
 interface ConfirmModalProps {
   open: boolean;
   title: string;
-  description: string;
+  description?: string;
   confirmLabel?: string;
   cancelLabel?: string;
   onConfirm: () => void;
@@ -13,7 +13,7 @@ interface ConfirmModalProps {
 export function ConfirmModal({
   open,
   title,
-  description,
+  description = "",
   confirmLabel = "ยืนยัน",
   cancelLabel = "ยกเลิก",
   onConfirm,
@@ -22,13 +22,21 @@ export function ConfirmModal({
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/32 p-4 backdrop-blur-sm">
-      <div className="w-full max-w-md rounded-2xl border border-white/70 bg-white/95 p-7 shadow-[0_28px_90px_rgba(15,23,42,0.18)]">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/32 p-4 backdrop-blur-sm"
+      onClick={onCancel}
+    >
+      <div
+        className="w-full max-w-md rounded-2xl border border-white/70 bg-white/95 p-7 shadow-[0_28px_90px_rgba(15,23,42,0.18)]"
+        onClick={(event) => event.stopPropagation()}
+      >
         <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[#e9f5ef] text-[#007946]">
           <CircleAlert className="h-7 w-7" />
         </div>
         <h2 className="mt-5 text-2xl font-semibold tracking-tight text-slate-900">{title}</h2>
-        <p className="mt-3 text-sm leading-7 text-slate-600">{description}</p>
+        {description ? (
+          <p className="mt-3 text-sm leading-7 text-slate-600">{description}</p>
+        ) : null}
         <div className="mt-8 flex flex-wrap items-center justify-end gap-3">
           <button
             type="button"

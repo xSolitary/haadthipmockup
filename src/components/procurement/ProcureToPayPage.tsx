@@ -7,6 +7,7 @@ import { Download, Eye, Pencil, Plus, Search, X } from "lucide-react";
 import { DataTable } from "@/components/ui/DataTable";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { StatusBadge } from "@/components/ui/StatusBadge";
+import { downloadPoPdf, downloadPrPdf } from "@/lib/pdf";
 import type { MemoRequest, PurchaseOrder } from "@/lib/types";
 import { getCategoryLabel, getStatusLabel } from "@/lib/ui-text";
 import { useProcurementStore } from "@/store/useProcurementStore";
@@ -37,10 +38,6 @@ const dashboardShellClass = "rounded-[30px] border border-[var(--border)] bg-[va
 const dashboardInnerCardClass = "rounded-[22px] border border-[var(--border)] bg-[var(--surface-strong)] shadow-[var(--shadow-sm)]";
 const dashboardControlClass =
   "h-11 rounded-[18px] border border-[var(--border)] bg-[var(--surface)] text-sm text-slate-700 shadow-[var(--shadow-sm)] transition focus:outline-none focus:ring-0";
-const mockSuccessText = {
-  pr: "\u0e14\u0e32\u0e27\u0e19\u0e4c\u0e42\u0e2b\u0e25\u0e14 PR \u0e2a\u0e33\u0e40\u0e23\u0e47\u0e08 (Mock)",
-  po: "\u0e14\u0e32\u0e27\u0e19\u0e4c\u0e42\u0e2b\u0e25\u0e14 PO \u0e2a\u0e33\u0e40\u0e23\u0e47\u0e08 (Mock)",
-} as const;
 
 function SummaryTabCard({
   active,
@@ -566,6 +563,26 @@ export function ProcureToPayPage({ initialTab = "memo" }: { initialTab?: Procure
     setPreviewState(null);
   };
 
+  const runPdfDownload = (task: () => Promise<void>) => {
+    void (async () => {
+      try {
+        await task();
+        window.alert("ดาวน์โหลด PDF สำเร็จ");
+      } catch (error) {
+        console.error("Failed to generate PDF", error);
+        window.alert("ไม่สามารถสร้าง PDF ได้");
+      }
+    })();
+  };
+
+  const handleDownloadPr = (purchaseOrder: PurchaseOrder) => {
+    runPdfDownload(() => downloadPrPdf(purchaseOrder, memoById.get(purchaseOrder.memoId) ?? null));
+  };
+
+  const handleDownloadPo = (purchaseOrder: PurchaseOrder) => {
+    runPdfDownload(() => downloadPoPdf(purchaseOrder, memoById.get(purchaseOrder.memoId) ?? null));
+  };
+
   const switchTab = (tab: ProcureTab) => {
     setActiveTab(tab);
     setSearchTerm("");
@@ -977,7 +994,7 @@ export function ProcureToPayPage({ initialTab = "memo" }: { initialTab?: Procure
           title="Preview PR Document"
           downloadLabel="Download PR"
           onClose={closePreview}
-          onDownload={() => alert(mockSuccessText.pr)}
+          onDownload={() => handleDownloadPr(previewPr)}
         >
           <PrDocumentPreview purchaseOrder={previewPr} memo={memoById.get(previewPr.memoId) ?? null} />
         </PreviewModal>
@@ -988,7 +1005,7 @@ export function ProcureToPayPage({ initialTab = "memo" }: { initialTab?: Procure
           title="Preview PO Document"
           downloadLabel="Download PO"
           onClose={closePreview}
-          onDownload={() => alert(mockSuccessText.po)}
+          onDownload={() => handleDownloadPo(previewPo)}
         >
           <PoDocumentPreview purchaseOrder={previewPo} memo={memoById.get(previewPo.memoId) ?? null} />
         </PreviewModal>
