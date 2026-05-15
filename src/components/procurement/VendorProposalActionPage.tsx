@@ -552,7 +552,6 @@ export function VendorProposalActionPage({ poId }: { poId: string }) {
         open={successModal.open}
         title={successModal.title}
         description={successModal.description}
-        buttonLabel="ไปที่ My Requests"
         onClose={() => {
           setSuccessModal({ open: false, title: "", description: "" });
           router.push("/my-requests");

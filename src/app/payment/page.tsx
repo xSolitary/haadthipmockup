@@ -5,6 +5,7 @@ import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { DataTable } from "@/components/ui/DataTable";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { StatusBadge } from "@/components/ui/StatusBadge";
+import { SuccessModal } from "@/components/ui/SuccessModal";
 import { useProcurementStore } from "@/store/useProcurementStore";
 
 const formatCurrency = (value: number) =>
@@ -17,19 +18,47 @@ const formatCurrency = (value: number) =>
 export default function PaymentPage() {
   const paymentRequests = useProcurementStore((state) => state.paymentRequests);
   const updatePaymentStatus = useProcurementStore((state) => state.updatePaymentStatus);
+
   const [selectedPaymentId, setSelectedPaymentId] = useState<string | null>(paymentRequests[0]?.id ?? null);
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
+  const [successModal, setSuccessModal] = useState({
+    open: false,
+    title: "",
+    description: "",
+  });
 
   const selectedPayment = paymentRequests.find((payment) => payment.id === selectedPaymentId) ?? null;
 
   const handleStatus = async () => {
     if (!selectedPayment) return;
+
     if (selectedPayment.status === "Pending Invoice") {
       await updatePaymentStatus(selectedPayment.id, "Ready for AP Posting");
-    } else if (selectedPayment.status === "Ready for AP Posting") {
+      setSuccessModal({
+        open: true,
+        title: "ยืนยัน Invoice สำเร็จ",
+        description: "ระบบได้บันทึกใบแจ้งหนี้และอัปเดตสถานะเป็น Ready for AP Posting แล้ว",
+      });
+      return;
+    }
+
+    if (selectedPayment.status === "Ready for AP Posting") {
       await updatePaymentStatus(selectedPayment.id, "Approved for Payment");
-    } else if (selectedPayment.status === "Approved for Payment") {
+      setSuccessModal({
+        open: true,
+        title: "อนุมัติชำระเงินสำเร็จ",
+        description: "ระบบได้อัปเดตสถานะเป็น Approved for Payment เรียบร้อยแล้ว",
+      });
+      return;
+    }
+
+    if (selectedPayment.status === "Approved for Payment") {
       await updatePaymentStatus(selectedPayment.id, "Paid");
+      setSuccessModal({
+        open: true,
+        title: "ยืนยันการจ่ายเงินสำเร็จ",
+        description: "ระบบได้อัปเดตสถานะการชำระเงินเป็น Paid เรียบร้อยแล้ว",
+      });
     }
   };
 
@@ -71,6 +100,7 @@ export default function PaymentPage() {
             </DataTable>
           </div>
         </div>
+
         <div className="space-y-6">
           <div className="rounded-[24px] border border-slate-200 bg-white p-5 shadow-sm shadow-slate-200/50 sm:p-6">
             {selectedPayment ? (
@@ -108,9 +138,7 @@ export default function PaymentPage() {
                       สถานะการอัปโหลด Invoice
                     </span>
                     <span className="mt-2 block font-semibold text-slate-900">
-                      {selectedPayment.invoiceUploaded
-                        ? "อัปโหลด Invoice แล้ว"
-                        : "ยังไม่ได้อัปโหลด"}
+                      {selectedPayment.invoiceUploaded ? "อัปโหลด Invoice แล้ว" : "ยังไม่ได้อัปโหลด"}
                     </span>
                   </label>
                   <button
@@ -129,6 +157,7 @@ export default function PaymentPage() {
           </div>
         </div>
       </div>
+
       <ConfirmModal
         open={isConfirmOpen}
         title="ยืนยันการจ่ายเงิน?"
@@ -139,6 +168,12 @@ export default function PaymentPage() {
           setIsConfirmOpen(false);
           void handleStatus();
         }}
+      />
+      <SuccessModal
+        open={successModal.open}
+        title={successModal.title}
+        description={successModal.description}
+        onClose={() => setSuccessModal({ open: false, title: "", description: "" })}
       />
     </div>
   );

@@ -18,7 +18,7 @@ const LABEL_WIDTH = 118;
 const CONTENT_WIDTH = 595.28 - PAGE_MARGIN * 2;
 const METADATA_LINE_HEIGHT = 18;
 const BODY_FONT_SIZE = 10;
-const TABLE_FONT_SIZE = 9;
+const TABLE_FONT_SIZE = 10;
 
 const currencyFormatter = new Intl.NumberFormat("en-US", {
   style: "currency",
@@ -41,32 +41,58 @@ const formatDate = (value?: string) => {
 };
 
 const normalizeText = (value?: string | null) => {
-  if (!value) return "-";
-  return value.replace(/\s+/g, " ").trim() || "-";
+  if (!value) return "";
+  return value.replace(/\s+/g, " ").trim();
 };
 
-const containsMojibake = (value: string) => /(à¸|à¹|Ã.|Â.|â.|¤|�)/.test(value);
+const containsMojibake = (value: string) =>
+  /(?:Ã.|Â.|à¸|à¹|ðŸ|�|ï¿½|€™|â€¢|â€œ|â€\u009d|â€“|â€”)/.test(value);
 
-const sanitizeDisplayText = (value?: string | null, options?: { maxLength?: number }) => {
+const stripUnsafeText = (value: string) =>
+  value
+    .replace(/[^\x20-\x7E]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+const sanitizePdfText = (
+  value: string | null | undefined,
+  fallback: string,
+  options?: { maxLength?: number },
+) => {
   const normalized = normalizeText(value);
-  if (normalized === "-" || containsMojibake(normalized)) {
-    return "-";
+  if (!normalized) return fallback;
+
+  const stripped = containsMojibake(normalized) ? stripUnsafeText(normalized) : normalized;
+  const asciiSafe = stripUnsafeText(stripped);
+  if (!asciiSafe) return fallback;
+
+  if (options?.maxLength && asciiSafe.length > options.maxLength) {
+    return `${asciiSafe.slice(0, options.maxLength).trimEnd()}...`;
   }
 
-  if (options?.maxLength && normalized.length > options.maxLength) {
-    return `${normalized.slice(0, options.maxLength).trimEnd()}...`;
-  }
-
-  return normalized;
+  return asciiSafe;
 };
+
+const sanitizeFilenameSegment = (value: string | null | undefined, fallback: string) => {
+  const safe = sanitizePdfText(value, fallback).replace(/[^A-Za-z0-9_-]/g, "-");
+  return safe.replace(/-+/g, "-").replace(/^-|-$/g, "") || fallback;
+};
+
+const sanitizeDepartmentSite = (memo: MemoRequest | null) => {
+  const department = sanitizePdfText(memo?.department, "Hat Yai Plant");
+  const site = sanitizePdfText(memo?.site, "Hat Yai Plant");
+  return department === site ? department : `${department} / ${site}`;
+};
+
+const sanitizeHistoryComment = (value?: string | null) => sanitizePdfText(value, "-", { maxLength: 120 });
 
 const buildItems = (purchaseOrder: PurchaseOrder, memo: MemoRequest | null): PdfItemRow[] => {
   const memoItems = memo?.items ?? [];
   if (memoItems.length > 0) {
-    return memoItems.map((item) => ({
-      name: sanitizeDisplayText(item.name),
+    return memoItems.map((item, index) => ({
+      name: sanitizePdfText(item.name, `Item ${index + 1}`),
       quantity: item.quantity,
-      unit: sanitizeDisplayText(item.unit),
+      unit: sanitizePdfText(item.unit, "Unit"),
       unitPrice: item.unitPrice,
       total: item.quantity * item.unitPrice,
     }));
@@ -74,7 +100,7 @@ const buildItems = (purchaseOrder: PurchaseOrder, memo: MemoRequest | null): Pdf
 
   return [
     {
-      name: sanitizeDisplayText(purchaseOrder.memoTitle),
+      name: sanitizePdfText(purchaseOrder.memoTitle, "Item 1"),
       quantity: 1,
       unit: "Lot",
       unitPrice: purchaseOrder.amount,
@@ -102,7 +128,7 @@ const addFieldBlock = (doc: import("jspdf").jsPDF, fields: PdfField[], startY: n
 
     doc.setFont("helvetica", "normal");
     doc.setTextColor(15, 23, 42);
-    const lines = doc.splitTextToSize(sanitizeDisplayText(field.value), valueWidth);
+    const lines = doc.splitTextToSize(field.value, valueWidth);
     doc.text(lines, valueX, y);
     y += Math.max(METADATA_LINE_HEIGHT, lines.length * 12 + 6);
   });
@@ -132,21 +158,31 @@ async function createBaseDocument(title: string) {
   return { doc, autoTable };
 }
 
+const tableStyles = {
+  font: "helvetica" as const,
+  fontSize: TABLE_FONT_SIZE,
+  cellPadding: 3,
+  textColor: [15, 23, 42] as [number, number, number],
+  overflow: "linebreak" as const,
+  lineWidth: 0.1,
+  valign: "top" as const,
+};
+
 export async function downloadPrPdf(purchaseOrder: PurchaseOrder, memo: MemoRequest | null) {
   const { doc, autoTable } = await createBaseDocument("Purchase Requisition (PR)");
-  const prNumber = purchaseOrder.prNumber ?? purchaseOrder.documentNumber;
+  const prNumber = sanitizePdfText(purchaseOrder.prNumber ?? purchaseOrder.documentNumber, "PR-Document");
   const items = buildItems(purchaseOrder, memo);
   const totalAmount = memo?.estimatedTotal ?? purchaseOrder.amount;
 
   let cursorY = addFieldBlock(
     doc,
     [
-      { label: "PR No.", value: prNumber },
-      { label: "Memo No.", value: memo?.documentNumber ?? "-" },
-      { label: "Requester", value: memo?.requesterName ?? "-" },
-      { label: "Department / Site", value: `${memo?.department ?? "-"} / ${memo?.site ?? "-"}` },
+      { label: "PR No", value: prNumber },
+      { label: "Memo No", value: sanitizePdfText(memo?.documentNumber, "-") },
+      { label: "Requester", value: sanitizePdfText(memo?.requesterName, "Requester") },
+      { label: "Department/Site", value: sanitizeDepartmentSite(memo) },
       { label: "Date", value: formatDate(memo?.requestDate ?? purchaseOrder.createdAt) },
-      { label: "Status", value: purchaseOrder.procurementStatus },
+      { label: "Status", value: sanitizePdfText(purchaseOrder.procurementStatus, "Open") },
     ],
     72,
   );
@@ -165,22 +201,14 @@ export async function downloadPrPdf(purchaseOrder: PurchaseOrder, memo: MemoRequ
       formatCurrency(item.total),
     ]),
     theme: "grid",
-    styles: {
-      font: "helvetica",
-      fontSize: TABLE_FONT_SIZE,
-      cellPadding: 3,
-      textColor: [15, 23, 42],
-      overflow: "linebreak",
-      lineWidth: 0.1,
-      valign: "top",
-    },
+    styles: tableStyles,
     headStyles: { fillColor: [0, 121, 70], textColor: 255, fontStyle: "bold" },
     columnStyles: {
-      0: { cellWidth: 220 },
+      0: { cellWidth: 215 },
       1: { cellWidth: 48, halign: "right" },
       2: { cellWidth: 56 },
-      3: { cellWidth: 96, halign: "right" },
-      4: { cellWidth: 96, halign: "right" },
+      3: { cellWidth: 98, halign: "right" },
+      4: { cellWidth: 106, halign: "right" },
     },
   });
 
@@ -199,39 +227,31 @@ export async function downloadPrPdf(purchaseOrder: PurchaseOrder, memo: MemoRequ
       head: [["Date", "Action", "Actor", "Role", "Comment"]],
       body: purchaseOrder.history.map((entry) => [
         formatDate(entry.date),
-        sanitizeDisplayText(entry.actionLabelTh || entry.action),
-        sanitizeDisplayText(entry.actorName),
-        sanitizeDisplayText(entry.role),
-        sanitizeDisplayText(entry.comment, { maxLength: 120 }),
+        sanitizePdfText(entry.action, "Update"),
+        sanitizePdfText(entry.actorName, "User"),
+        sanitizePdfText(entry.role, "-"),
+        sanitizeHistoryComment(entry.comment),
       ]),
       theme: "grid",
-      styles: {
-        font: "helvetica",
-        fontSize: TABLE_FONT_SIZE,
-        cellPadding: 3,
-        textColor: [15, 23, 42],
-        overflow: "linebreak",
-        lineWidth: 0.1,
-        valign: "top",
-      },
+      styles: tableStyles,
       headStyles: { fillColor: [71, 85, 105], textColor: 255, fontStyle: "bold" },
       columnStyles: {
-        0: { cellWidth: 62 },
-        1: { cellWidth: 78 },
-        2: { cellWidth: 78 },
-        3: { cellWidth: 56 },
-        4: { cellWidth: 193 },
+        0: { cellWidth: 66 },
+        1: { cellWidth: 86 },
+        2: { cellWidth: 84 },
+        3: { cellWidth: 62 },
+        4: { cellWidth: 171 },
       },
     });
   }
 
-  doc.save(`PR-${prNumber}.pdf`);
+  doc.save(`PR-${sanitizeFilenameSegment(prNumber, "document")}.pdf`);
 }
 
 export async function downloadPoPdf(purchaseOrder: PurchaseOrder, memo: MemoRequest | null) {
   const { doc, autoTable } = await createBaseDocument("Purchase Order (PO)");
-  const poNumber = purchaseOrder.poNumber ?? purchaseOrder.documentNumber;
-  const prNumber = purchaseOrder.prNumber ?? purchaseOrder.documentNumber;
+  const poNumber = sanitizePdfText(purchaseOrder.poNumber ?? purchaseOrder.documentNumber, "PO-Document");
+  const prNumber = sanitizePdfText(purchaseOrder.prNumber ?? purchaseOrder.documentNumber, "PR-Document");
   const items = buildItems(purchaseOrder, memo);
   const totalAmount = purchaseOrder.amount;
   const selectedProposal = getSelectedProposal(purchaseOrder);
@@ -239,14 +259,12 @@ export async function downloadPoPdf(purchaseOrder: PurchaseOrder, memo: MemoRequ
   let cursorY = addFieldBlock(
     doc,
     [
-      { label: "PO No.", value: poNumber },
-      { label: "PR No.", value: prNumber },
-      { label: "Vendor Name", value: purchaseOrder.selectedVendorName ?? purchaseOrder.vendorName },
-      { label: "Department / Site", value: `${memo?.department ?? "-"} / ${memo?.site ?? "-"}` },
-      { label: "Delivery Location", value: memo?.deliveryLocation ?? "-" },
-      { label: "Payment Term", value: selectedProposal?.paymentTerms ?? "-" },
+      { label: "PO No", value: poNumber },
+      { label: "PR No", value: prNumber },
+      { label: "Vendor", value: sanitizePdfText(purchaseOrder.selectedVendorName ?? purchaseOrder.vendorName, "Vendor") },
+      { label: "Department/Site", value: sanitizeDepartmentSite(memo) },
       { label: "Date", value: formatDate(purchaseOrder.updatedAt || purchaseOrder.createdAt) },
-      { label: "Status", value: purchaseOrder.procurementStatus },
+      { label: "Status", value: sanitizePdfText(purchaseOrder.procurementStatus, "Open") },
     ],
     72,
   );
@@ -265,22 +283,14 @@ export async function downloadPoPdf(purchaseOrder: PurchaseOrder, memo: MemoRequ
       formatCurrency(item.total),
     ]),
     theme: "grid",
-    styles: {
-      font: "helvetica",
-      fontSize: TABLE_FONT_SIZE,
-      cellPadding: 3,
-      textColor: [15, 23, 42],
-      overflow: "linebreak",
-      lineWidth: 0.1,
-      valign: "top",
-    },
+    styles: tableStyles,
     headStyles: { fillColor: [0, 121, 70], textColor: 255, fontStyle: "bold" },
     columnStyles: {
-      0: { cellWidth: 220 },
+      0: { cellWidth: 215 },
       1: { cellWidth: 48, halign: "right" },
       2: { cellWidth: 56 },
-      3: { cellWidth: 96, halign: "right" },
-      4: { cellWidth: 96, halign: "right" },
+      3: { cellWidth: 98, halign: "right" },
+      4: { cellWidth: 106, halign: "right" },
     },
   });
 
@@ -298,32 +308,51 @@ export async function downloadPoPdf(purchaseOrder: PurchaseOrder, memo: MemoRequ
     head: [["Vendor", "Quoted Price", "Lead Time", "Payment Term", "Notes"]],
     body: [
       [
-        sanitizeDisplayText(purchaseOrder.selectedVendorName ?? purchaseOrder.vendorName),
+        sanitizePdfText(purchaseOrder.selectedVendorName ?? purchaseOrder.vendorName, "Vendor"),
         formatCurrency(selectedProposal?.quotedPrice ?? purchaseOrder.amount),
-        sanitizeDisplayText(selectedProposal?.leadTime ?? "-"),
-        sanitizeDisplayText(selectedProposal?.paymentTerms ?? "-"),
-        sanitizeDisplayText(selectedProposal?.notes ?? "-", { maxLength: 120 }),
+        sanitizePdfText(selectedProposal?.leadTime, "-"),
+        sanitizePdfText(selectedProposal?.paymentTerms, "-"),
+        sanitizePdfText(selectedProposal?.notes, "-", { maxLength: 120 }),
       ],
     ],
     theme: "grid",
-    styles: {
-      font: "helvetica",
-      fontSize: TABLE_FONT_SIZE,
-      cellPadding: 3,
-      textColor: [15, 23, 42],
-      overflow: "linebreak",
-      lineWidth: 0.1,
-      valign: "top",
-    },
+    styles: tableStyles,
     headStyles: { fillColor: [71, 85, 105], textColor: 255, fontStyle: "bold" },
     columnStyles: {
       0: { cellWidth: 120 },
-      1: { cellWidth: 90, halign: "right" },
-      2: { cellWidth: 78 },
-      3: { cellWidth: 92 },
-      4: { cellWidth: 143 },
+      1: { cellWidth: 92, halign: "right" },
+      2: { cellWidth: 82 },
+      3: { cellWidth: 98 },
+      4: { cellWidth: 131 },
     },
   });
 
-  doc.save(`PO-${poNumber}.pdf`);
+  if (purchaseOrder.history.length > 0) {
+    cursorY = (doc.lastAutoTable?.finalY ?? cursorY) + 24;
+    cursorY = addSectionTitle(doc, "Approval History", cursorY);
+    autoTable(doc, {
+      startY: cursorY,
+      margin: { left: PAGE_MARGIN, right: PAGE_MARGIN },
+      head: [["Date", "Action", "Actor", "Role", "Comment"]],
+      body: purchaseOrder.history.map((entry) => [
+        formatDate(entry.date),
+        sanitizePdfText(entry.action, "Update"),
+        sanitizePdfText(entry.actorName, "User"),
+        sanitizePdfText(entry.role, "-"),
+        sanitizeHistoryComment(entry.comment),
+      ]),
+      theme: "grid",
+      styles: tableStyles,
+      headStyles: { fillColor: [71, 85, 105], textColor: 255, fontStyle: "bold" },
+      columnStyles: {
+        0: { cellWidth: 66 },
+        1: { cellWidth: 86 },
+        2: { cellWidth: 84 },
+        3: { cellWidth: 62 },
+        4: { cellWidth: 171 },
+      },
+    });
+  }
+
+  doc.save(`PO-${sanitizeFilenameSegment(poNumber, "document")}.pdf`);
 }

@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { StatusBadge } from "@/components/ui/StatusBadge";
+import { SuccessModal } from "@/components/ui/SuccessModal";
 import { useProcurementStore } from "@/store/useProcurementStore";
 
 const formatCurrency = (value: number) =>
@@ -28,8 +29,15 @@ export default function ReceivingPage() {
       ),
     [purchaseOrders],
   );
+
   const [selectedPoId, setSelectedPoId] = useState<string | null>(waitingOrders[0]?.id ?? null);
   const [isQcConfirmOpen, setIsQcConfirmOpen] = useState(false);
+  const [successModal, setSuccessModal] = useState({
+    open: false,
+    title: "",
+    description: "",
+  });
+
   const selectedOrder = waitingOrders.find((order) => order.id === selectedPoId) ?? null;
   const existingRecord = receivingRecords.find((record) => record.poId === selectedPoId) ?? null;
 
@@ -46,6 +54,7 @@ export default function ReceivingPage() {
 
   const handleReceive = async () => {
     if (!selectedOrder) return;
+
     await receivePo(selectedOrder.id, {
       deliveryDate,
       receivedQty,
@@ -57,6 +66,25 @@ export default function ReceivingPage() {
       qcRequired,
       qcStatus: qcRequired ? "Pending QC" : "Not Required",
       notes: "รับสินค้าตาม PO และบันทึกข้อมูลเข้าระบบเรียบร้อย",
+    });
+
+    setSuccessModal({
+      open: true,
+      title: "รับสินค้าสำเร็จ",
+      description: qcRequired
+        ? "ระบบได้บันทึกรับสินค้าเรียบร้อยแล้ว และส่งรายการเข้าสู่ขั้นตอน QC"
+        : "ระบบได้บันทึกรับสินค้าเรียบร้อยแล้ว",
+    });
+  };
+
+  const handleMarkQcPassed = async () => {
+    if (!selectedOrder) return;
+
+    await markQcPassed(selectedOrder.id);
+    setSuccessModal({
+      open: true,
+      title: "ยืนยัน QC สำเร็จ",
+      description: "ระบบได้บันทึกผลการตรวจสอบคุณภาพเรียบร้อยแล้ว",
     });
   };
 
@@ -98,6 +126,7 @@ export default function ReceivingPage() {
             )}
           </div>
         </div>
+
         <div className="space-y-6">
           <div className="rounded-[24px] border border-slate-200 bg-white p-5 shadow-sm shadow-slate-200/50 sm:p-6">
             {selectedOrder ? (
@@ -206,6 +235,7 @@ export default function ReceivingPage() {
               <p className="text-sm text-slate-500">เลือก PO เพื่อกรอกข้อมูลรับสินค้า</p>
             )}
           </div>
+
           {existingRecord ? (
             <div className="mt-6 rounded-[24px] border border-slate-200 bg-slate-50 p-6 text-sm text-slate-700">
               <div className="flex items-center justify-between gap-3">
@@ -215,7 +245,9 @@ export default function ReceivingPage() {
                 </div>
                 <button
                   type="button"
-                  onClick={() => selectedOrder && void markQcPassed(selectedOrder.id)}
+                  onClick={() => {
+                    void handleMarkQcPassed();
+                  }}
                   className="inline-flex h-10 items-center rounded-xl bg-emerald-600 px-4 text-sm font-semibold text-white transition hover:bg-emerald-700"
                 >
                   ยืนยันผ่าน QC
@@ -225,6 +257,7 @@ export default function ReceivingPage() {
           ) : null}
         </div>
       </div>
+
       <ConfirmModal
         open={isQcConfirmOpen}
         title="ยืนยันผล QC?"
@@ -236,6 +269,12 @@ export default function ReceivingPage() {
           setIsQcConfirmOpen(false);
           void handleReceive();
         }}
+      />
+      <SuccessModal
+        open={successModal.open}
+        title={successModal.title}
+        description={successModal.description}
+        onClose={() => setSuccessModal({ open: false, title: "", description: "" })}
       />
     </div>
   );

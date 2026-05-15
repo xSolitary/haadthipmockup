@@ -1,12 +1,14 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import type { ReactNode } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Plus, Trash2 } from "lucide-react";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { FormSection } from "@/components/ui/FormSection";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { StatusBadge } from "@/components/ui/StatusBadge";
+import { SuccessModal } from "@/components/ui/SuccessModal";
 import { departments, sites } from "@/lib/mock-data";
 import type { MemoItem, MemoRequest, ProcurementCategory } from "@/lib/types";
 import { getCategoryLabel, getUrgencyLabel } from "@/lib/ui-text";
@@ -27,6 +29,18 @@ const urgencyOptions = ["Normal", "Urgent", "Emergency"] as const;
 
 const formatCurrency = (value: number) =>
   new Intl.NumberFormat("th-TH", { style: "currency", currency: "THB" }).format(value);
+
+type EditorSuccessModalState = {
+  open: boolean;
+  title: string;
+  description: ReactNode;
+};
+
+const defaultSuccessModalState: EditorSuccessModalState = {
+  open: false,
+  title: "",
+  description: "",
+};
 
 function createBlankItem(index: number): MemoItem {
   return {
@@ -117,16 +131,15 @@ export function MemoEditorPage({ memoId }: { memoId?: string }) {
   const submitMemo = useProcurementStore((state) => state.submitMemo);
   const resubmitMemo = useProcurementStore((state) => state.resubmitMemo);
 
-  const editingMemo = useMemo(
-    () => (memoId ? memos.find((memo) => memo.id === memoId) ?? null : null),
-    [memoId, memos],
-  );
+  const editingMemo = useMemo(() => (memoId ? memos.find((memo) => memo.id === memoId) ?? null : null), [memoId, memos]);
   const isEditing = Boolean(memoId);
   const canEdit =
     !isEditing ||
-    (editingMemo &&
-      editingMemo.requesterId === currentUserId &&
-      (editingMemo.status === "Draft" || editingMemo.status === "Revision Required"));
+    Boolean(
+      editingMemo &&
+        editingMemo.requesterId === currentUserId &&
+        (editingMemo.status === "Draft" || editingMemo.status === "Revision Required"),
+    );
 
   const initialValues = getMemoValues(editingMemo, currentUser);
   const [title, setTitle] = useState(initialValues.title);
@@ -142,16 +155,23 @@ export function MemoEditorPage({ memoId }: { memoId?: string }) {
   const [items, setItems] = useState(initialValues.items);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isCreateConfirmOpen, setIsCreateConfirmOpen] = useState(false);
+  const [successModal, setSuccessModal] = useState<EditorSuccessModalState>(defaultSuccessModalState);
+  const [isCompletingResubmit, setIsCompletingResubmit] = useState(false);
 
-  const total = useMemo(
-    () => items.reduce((sum, item) => sum + item.quantity * item.unitPrice, 0),
-    [items],
-  );
+  const shouldShowEditor = !isEditing || Boolean(editingMemo) && (canEdit || successModal.open || isCompletingResubmit);
+
+  const total = useMemo(() => items.reduce((sum, item) => sum + item.quantity * item.unitPrice, 0), [items]);
 
   const latestRevisionReason = editingMemo?.history
     .slice()
     .reverse()
     .find((entry) => entry.action === "Revision Required" || entry.action === "Rejected")?.comment;
+
+  useEffect(() => {
+    if (isEditing && (!editingMemo || (!canEdit && !successModal.open && !isCompletingResubmit))) {
+      router.replace("/my-requests?tab=memo");
+    }
+  }, [canEdit, editingMemo, isCompletingResubmit, isEditing, router, successModal.open]);
 
   const handleItemChange = (id: string, field: keyof MemoItem, value: string | number) => {
     setItems((current) =>
@@ -216,7 +236,7 @@ export function MemoEditorPage({ memoId }: { memoId?: string }) {
       } else {
         await createMemo(payload);
       }
-      router.push("/my-requests");
+      router.push("/my-requests?tab=memo");
     } finally {
       setIsSubmitting(false);
     }
@@ -229,16 +249,27 @@ export function MemoEditorPage({ memoId }: { memoId?: string }) {
     try {
       if (isEditing && editingMemo) {
         if (editingMemo.status === "Revision Required") {
+          setIsCompletingResubmit(true);
           await resubmitMemo(editingMemo.id, payload);
+          setSuccessModal({
+            open: true,
+            title: "ส่ง Memo กลับไปอนุมัติสำเร็จ",
+            description: "ระบบได้ส่ง Memo ให้หัวหน้าพิจารณาอีกครั้งแล้ว",
+          });
         } else {
           await updateMemo(editingMemo.id, payload);
           await submitMemo(editingMemo.id);
+          router.push("/my-requests?tab=memo");
         }
       } else {
         const createdMemoId = await createMemo(payload);
         await submitMemo(createdMemoId);
+        setSuccessModal({
+          open: true,
+          title: "สร้าง Memo สำเร็จ",
+          description: "ระบบได้สร้างและส่ง Memo เข้าสู่ขั้นตอนอนุมัติเรียบร้อยแล้ว",
+        });
       }
-      router.push("/my-requests");
     } finally {
       setIsSubmitting(false);
     }
@@ -253,24 +284,8 @@ export function MemoEditorPage({ memoId }: { memoId?: string }) {
     setIsCreateConfirmOpen(true);
   };
 
-  if (isEditing && (!editingMemo || !canEdit)) {
-    return (
-      <div className="space-y-6">
-        <PageHeader title="แก้ไข Memo" subtitle="ไม่สามารถแก้ไข Memo รายการนี้ได้" />
-        <div className="rounded-[24px] border border-slate-200 bg-white p-6 shadow-sm shadow-slate-200/50">
-          <p className="text-sm text-slate-600">
-            Memo นี้ต้องอยู่ในสถานะ Draft หรือ Revision Required และเป็นรายการของผู้ขอซื้อปัจจุบันเท่านั้น
-          </p>
-          <button
-            type="button"
-            onClick={() => router.push("/my-requests")}
-            className="mt-4 inline-flex h-10 items-center rounded-xl bg-[#007946] px-4 text-sm font-semibold text-white transition hover:bg-[#005f37]"
-          >
-            กลับไปหน้า Procure-to-Pay
-          </button>
-        </div>
-      </div>
-    );
+  if (!shouldShowEditor) {
+    return null;
   }
 
   const isRevision = editingMemo?.status === "Revision Required";
@@ -447,9 +462,7 @@ export function MemoEditorPage({ memoId }: { memoId?: string }) {
                         type="number"
                         min={1}
                         value={item.quantity}
-                        onChange={(event) =>
-                          handleItemChange(item.id, "quantity", Number(event.target.value))
-                        }
+                        onChange={(event) => handleItemChange(item.id, "quantity", Number(event.target.value))}
                         className="h-11 w-full rounded-xl border border-slate-200 bg-white px-4 text-sm text-slate-900"
                       />
                     </label>
@@ -459,9 +472,7 @@ export function MemoEditorPage({ memoId }: { memoId?: string }) {
                         type="number"
                         min={0}
                         value={item.unitPrice}
-                        onChange={(event) =>
-                          handleItemChange(item.id, "unitPrice", Number(event.target.value))
-                        }
+                        onChange={(event) => handleItemChange(item.id, "unitPrice", Number(event.target.value))}
                         className="h-11 w-full rounded-xl border border-slate-200 bg-white px-4 text-sm text-slate-900"
                       />
                     </label>
@@ -532,9 +543,7 @@ export function MemoEditorPage({ memoId }: { memoId?: string }) {
               </div>
               <div className="rounded-[20px] border border-slate-200 bg-slate-50 p-4">
                 <p className="text-slate-500">Budget คงเหลือ</p>
-                <p className="mt-2 font-semibold text-slate-900">
-                  {formatCurrency(editingMemo?.budgetRemaining ?? 380000)}
-                </p>
+                <p className="mt-2 font-semibold text-slate-900">{formatCurrency(editingMemo?.budgetRemaining ?? 380000)}</p>
               </div>
             </div>
           </div>
@@ -542,15 +551,9 @@ export function MemoEditorPage({ memoId }: { memoId?: string }) {
           <div className="rounded-[24px] border border-slate-200 bg-white p-6 shadow-sm shadow-slate-200/50">
             <h2 className="text-lg font-semibold text-slate-900">การตรวจสอบระบบ</h2>
             <div className="mt-4 space-y-3 text-sm text-slate-600">
-              <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
-                ตรวจสอบสต็อก Inventory: ผ่าน
-              </div>
-              <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
-                ตรวจสอบ Budget: ผ่าน
-              </div>
-              <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
-                Vendor hint: Vendor master พร้อมใช้งาน
-              </div>
+              <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">ตรวจสอบสต็อก Inventory: ผ่าน</div>
+              <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">ตรวจสอบ Budget: ผ่าน</div>
+              <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">Vendor hint: Vendor master พร้อมใช้งาน</div>
             </div>
           </div>
 
@@ -584,7 +587,7 @@ export function MemoEditorPage({ memoId }: { memoId?: string }) {
               </button>
               <button
                 type="button"
-                onClick={() => router.push("/my-requests")}
+                onClick={() => router.push("/my-requests?tab=memo")}
                 disabled={isSubmitting}
                 className="h-10 w-full rounded-xl bg-slate-100 px-4 text-sm font-semibold text-slate-700 transition hover:bg-slate-200 disabled:cursor-not-allowed disabled:opacity-60"
               >
@@ -605,6 +608,16 @@ export function MemoEditorPage({ memoId }: { memoId?: string }) {
         onConfirm={() => {
           setIsCreateConfirmOpen(false);
           void handleSubmit();
+        }}
+      />
+      <SuccessModal
+        open={successModal.open}
+        title={successModal.title}
+        description={successModal.description}
+        onClose={() => {
+          setIsCompletingResubmit(false);
+          setSuccessModal(defaultSuccessModalState);
+          router.push("/my-requests?tab=memo");
         }}
       />
     </div>
