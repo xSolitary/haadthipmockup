@@ -30,7 +30,8 @@ export default function LoginPage() {
     }
 
     startTransition(() => {
-      router.replace("/");
+      const nextRole = useProcurementStore.getState().currentRole;
+      router.replace(nextRole === "Vendor" ? "/my-requests?tab=po" : "/");
     });
   };
 
@@ -73,7 +74,8 @@ export default function LoginPage() {
                 Procurement System
               </h1>
               <p className="mt-6 max-w-lg text-lg leading-8 text-white/82">
-                ระบบติดตามคำขอจัดซื้อ การอนุมัติ การรับสินค้า และการชำระเงินสำหรับกระบวนการ Procure-to-Pay
+                ระบบติดตามคำขอจัดซื้อ การอนุมัติ การรับสินค้า และการชำระเงินสำหรับกระบวนการ
+                Procure-to-Pay
               </p>
             </div>
 
@@ -90,7 +92,9 @@ export default function LoginPage() {
           <div className="relative z-10 w-full max-w-[27rem] rounded-[32px] border border-[#d9e4dc] bg-white/92 p-7 shadow-[0_28px_70px_rgba(15,23,42,0.12)] backdrop-blur-sm sm:p-9">
             <div className="text-center">
               <h2 className="text-4xl font-bold tracking-tight text-slate-900">Login</h2>
-              <p className="mt-3 text-base leading-7 text-slate-500">กรุณากรอกชื่อผู้ใช้และรหัสผ่านเพื่อเข้าใช้งานระบบเดโม</p>
+              <p className="mt-3 text-base leading-7 text-slate-500">
+                กรุณากรอกชื่อผู้ใช้และรหัสผ่านเพื่อเข้าใช้งานระบบเดโม
+              </p>
             </div>
 
             <form className="mt-8 space-y-5" onSubmit={handleSubmit}>
@@ -197,7 +201,7 @@ export default function LoginPage() {
                 >
                   {account.labelTh}
                   <span className="rounded-full bg-[#e5f5ee] px-2 py-0.5 text-xs text-[var(--primary-ink)]">
-                    1
+                    {account.labelEn}
                   </span>
                 </span>
               ))}
@@ -214,8 +218,11 @@ export default function LoginPage() {
                       <UserCircle2 className="h-7 w-7" />
                     </div>
                     <div>
-                      <p className="text-xl font-bold text-slate-900">{account.labelTh}</p>
-                      <p className="mt-1 text-sm text-slate-500">{getRoleLabel(account.role)}</p>
+                      <p className="text-xl font-bold text-slate-900">{account.name}</p>
+                      <p className="mt-1 text-sm text-slate-500">
+                        {account.labelTh} • {getRoleLabel(account.role)}
+                      </p>
+                      <p className="mt-1 text-sm text-slate-500">{account.subtitle}</p>
                     </div>
                   </div>
 

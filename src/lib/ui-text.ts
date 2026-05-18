@@ -1,7 +1,7 @@
 import type { ProcurementCategory, Role } from "@/lib/types";
 
 const statusLabelMap: Record<string, string> = {
-  Draft: "Draft",
+  Draft: "ฉบับร่าง",
   Pending: "รอดำเนินการ",
   "Pending Approval": "รออนุมัติ",
   Submitted: "ส่งแล้ว",
@@ -12,7 +12,7 @@ const statusLabelMap: Record<string, string> = {
   "PR Created": "สร้าง PR แล้ว",
   "Waiting for Purchasing to Propose Vendors": "รอฝ่ายจัดซื้อเสนอ Vendor",
   "Pending PR Approval": "รออนุมัติ PR",
-  "Pending Vendor Approval": "รอหัวหน้าเลือก Vendor",
+  "Pending Vendor Approval": "รออนุมัติการเลือก Vendor",
   "Vendor Approved": "อนุมัติ Vendor แล้ว",
   "PO Created": "สร้าง PO แล้ว",
   "Pending Receiving": "รอรับสินค้า",
@@ -20,7 +20,7 @@ const statusLabelMap: Record<string, string> = {
   "Pending PO Approval": "รออนุมัติ PO",
   "PO Approved": "อนุมัติ PO แล้ว",
   "PO Rejected": "ปฏิเสธ PO แล้ว",
-  "Sent to Vendor": "ส่งให้ Vendor แล้ว",
+  "Sent to Vendor": "ส่งให้ร้านค้าแล้ว",
   "QC Pending": "รอตรวจ QC",
   "QC Passed": "ผ่าน QC",
   "Vendor Selected": "เลือก Vendor แล้ว",
@@ -29,6 +29,10 @@ const statusLabelMap: Record<string, string> = {
   "Approved for Payment": "อนุมัติชำระเงินแล้ว",
   Paid: "ชำระเงินแล้ว",
   "Pending Invoice": "รอ Invoice",
+  "รับคำสั่งซื้อแล้ว": "รับคำสั่งซื้อแล้ว",
+  "กำลังเตรียมสินค้า": "กำลังเตรียมสินค้า",
+  "อยู่ระหว่างจัดส่ง": "อยู่ระหว่างจัดส่ง",
+  "จัดส่งถึงปลายทางแล้ว": "จัดส่งถึงปลายทางแล้ว",
 };
 
 const roleLabelMap: Record<Role, string> = {
@@ -36,6 +40,7 @@ const roleLabelMap: Record<Role, string> = {
   Approver: "ผู้อนุมัติ",
   Purchasing: "ฝ่ายจัดซื้อ",
   Finance: "การเงิน",
+  Vendor: "ร้านค้า",
   Admin: "ผู้ดูแลระบบ",
 };
 

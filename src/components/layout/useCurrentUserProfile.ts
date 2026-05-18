@@ -31,11 +31,6 @@ export function useCurrentUserProfile() {
 
   const handleLogout = () => {
     logout();
-
-    if (typeof window !== "undefined") {
-      window.localStorage.removeItem("ht-procurement-store");
-    }
-
     router.replace("/login");
   };
 

@@ -10,6 +10,11 @@ import { StatusBadge } from "@/components/ui/StatusBadge";
 import { downloadPoPdf, downloadPrPdf } from "@/lib/pdf";
 import type { MemoRequest, PurchaseOrder } from "@/lib/types";
 import { getCategoryLabel, getStatusLabel } from "@/lib/ui-text";
+import {
+  formatVendorUpdateTimestamp,
+  getVendorTimeline,
+  mergePurchaseOrderWithVendorDelivery,
+} from "@/lib/vendor-delivery";
 import { useProcurementStore } from "@/store/useProcurementStore";
 
 type ProcureTab = "memo" | "pr" | "po";
@@ -399,6 +404,8 @@ function matchesPoSearch(po: PurchaseOrder, searchTerm: string) {
     po.selectedVendorName ?? "",
     po.vendorName,
     po.procurementStatus,
+    po.vendorDeliveryStatus ?? "",
+    po.trackingNumber ?? "",
   ]
     .join(" ")
     .toLowerCase()
@@ -410,6 +417,7 @@ export function ProcureToPayPage({ initialTab = "memo" }: { initialTab?: Procure
   const currentUserId = useProcurementStore((state) => state.currentUserId);
   const memos = useProcurementStore((state) => state.memos);
   const purchaseOrders = useProcurementStore((state) => state.purchaseOrders);
+  const vendorDeliveries = useProcurementStore((state) => state.vendorDeliveries);
 
   const [activeTab, setActiveTab] = useState<ProcureTab>(initialTab);
   const [detailState, setDetailState] = useState<DetailState>(null);
@@ -417,10 +425,16 @@ export function ProcureToPayPage({ initialTab = "memo" }: { initialTab?: Procure
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
 
+  const mergedPurchaseOrders = useMemo(
+    () => purchaseOrders.map((po) => mergePurchaseOrderWithVendorDelivery(po, vendorDeliveries)),
+    [purchaseOrders, vendorDeliveries],
+  );
   const memoById = useMemo(() => new Map(memos.map((memo) => [memo.id, memo])), [memos]);
   const availableTabs: ProcureTab[] =
     currentRole === "Requester"
       ? ["memo"]
+      : currentRole === "Vendor"
+        ? ["po"]
       : currentRole === "Purchasing"
         ? ["pr", "po"]
         : ["memo", "pr", "po"];
@@ -443,38 +457,40 @@ export function ProcureToPayPage({ initialTab = "memo" }: { initialTab?: Procure
 
   const prItems = useMemo(
     () =>
-      purchaseOrders
+      mergedPurchaseOrders
         .filter((po) => {
           const memo = memoById.get(po.memoId);
           if (!memo) return false;
+          if (currentRole === "Vendor") return false;
           if (currentRole === "Purchasing") return true;
           if (currentRole === "Approver") return memo.assignedApproverId === currentUserId;
           return memo.requesterId === currentUserId;
         })
         .sort((a, b) => (a.updatedAt < b.updatedAt ? 1 : -1)),
-    [currentRole, currentUserId, memoById, purchaseOrders],
+    [currentRole, currentUserId, memoById, mergedPurchaseOrders],
   );
 
   const poItems = useMemo(
     () =>
-      purchaseOrders
+      mergedPurchaseOrders
         .filter((po) => poStatuses.includes(po.procurementStatus))
         .filter((po) => {
           const memo = memoById.get(po.memoId);
           if (!memo) return false;
+          if (currentRole === "Vendor") return Boolean(po.selectedVendorName);
           if (currentRole === "Purchasing") return true;
           if (currentRole === "Approver") return memo.assignedApproverId === currentUserId;
           return memo.requesterId === currentUserId;
         })
         .sort((a, b) => (a.updatedAt < b.updatedAt ? 1 : -1)),
-    [currentRole, currentUserId, memoById, purchaseOrders],
+    [currentRole, currentUserId, memoById, mergedPurchaseOrders],
   );
 
   const selectedMemo = detailState?.type === "memo" ? memos.find((memo) => memo.id === detailState.id) ?? null : null;
-  const selectedPr = detailState?.type === "pr" ? purchaseOrders.find((po) => po.id === detailState.id) ?? null : null;
-  const selectedPo = detailState?.type === "po" ? purchaseOrders.find((po) => po.id === detailState.id) ?? null : null;
-  const previewPr = previewState?.type === "pr" ? purchaseOrders.find((po) => po.id === previewState.id) ?? null : null;
-  const previewPo = previewState?.type === "po" ? purchaseOrders.find((po) => po.id === previewState.id) ?? null : null;
+  const selectedPr = detailState?.type === "pr" ? mergedPurchaseOrders.find((po) => po.id === detailState.id) ?? null : null;
+  const selectedPo = detailState?.type === "po" ? mergedPurchaseOrders.find((po) => po.id === detailState.id) ?? null : null;
+  const previewPr = previewState?.type === "pr" ? mergedPurchaseOrders.find((po) => po.id === previewState.id) ?? null : null;
+  const previewPo = previewState?.type === "po" ? mergedPurchaseOrders.find((po) => po.id === previewState.id) ?? null : null;
 
   const memoPendingCount = useMemo(
     () => memos.filter((memo) => memo.status === "Pending Approval").length,
@@ -489,21 +505,26 @@ export function ProcureToPayPage({ initialTab = "memo" }: { initialTab?: Procure
       "Pending PR Approval",
     ];
     const statuses = currentRole === "Purchasing" ? purchasingStatuses : managerStatuses;
-    return purchaseOrders.filter((po) => statuses.includes(po.procurementStatus)).length;
-  }, [currentRole, purchaseOrders]);
+    return mergedPurchaseOrders.filter((po) => statuses.includes(po.procurementStatus)).length;
+  }, [currentRole, mergedPurchaseOrders]);
 
   const poPendingCount = useMemo(
     () =>
-      purchaseOrders.filter((po) =>
+      mergedPurchaseOrders.filter((po) =>
         ["PO Created", "Sent to Vendor", "Pending Receiving", "Received"].includes(po.procurementStatus),
       ).length,
-    [purchaseOrders],
+    [mergedPurchaseOrders],
   );
 
   const tabMeta = [
     { id: "memo" as const, label: "Memo", count: memoRequests.length, pendingCount: memoPendingCount },
     { id: "pr" as const, label: "PR", count: prItems.length, pendingCount: prPendingCount },
-    { id: "po" as const, label: "PO", count: poItems.length, pendingCount: poPendingCount },
+    {
+      id: "po" as const,
+      label: currentRole === "Vendor" ? "PO / งานจัดส่ง" : "PO",
+      count: poItems.length,
+      pendingCount: poPendingCount,
+    },
   ];
   const visibleTabs = tabMeta.filter((tab) => availableTabs.includes(tab.id));
   const currentTab = availableTabs.includes(activeTab) ? activeTab : availableTabs[0];
@@ -604,10 +625,19 @@ export function ProcureToPayPage({ initialTab = "memo" }: { initialTab?: Procure
   };
 
   const getPrActionHref = (poId: string) => {
-    const po = purchaseOrders.find((item) => item.id === poId);
+    const po = mergedPurchaseOrders.find((item) => item.id === poId);
     if (!po) return null;
     if (currentRole === "Purchasing") return `/pr-po/${po.id}/action`;
     if (currentRole === "Approver" && po.procurementStatus === "Pending Vendor Approval") {
+      return `/pr-po/${po.id}/action`;
+    }
+    return null;
+  };
+
+  const getPoActionHref = (poId: string) => {
+    const po = mergedPurchaseOrders.find((item) => item.id === poId);
+    if (!po) return null;
+    if (currentRole === "Vendor" && po.selectedVendorName) {
       return `/pr-po/${po.id}/action`;
     }
     return null;
@@ -762,12 +792,12 @@ export function ProcureToPayPage({ initialTab = "memo" }: { initialTab?: Procure
               </p>
             ) : (
               <DataTable
-                headers={["PO", "หัวข้อ", "Vendor", "ยอดเงิน", "Status", ""]}
+                headers={["PO", "หัวข้อ", "Vendor", "ยอดเงิน", "สถานะจัดส่ง", "อัปเดตล่าสุด", "Status", ""]}
                 className="border-[var(--border)] shadow-[var(--shadow-sm)]"
                 headerClassName="bg-[rgba(244,249,246,0.96)]"
                 headerCellClassName="px-4 py-3 text-xs font-semibold text-slate-500"
                 bodyClassName="[&_td]:py-3"
-                tableClassName="min-w-[1040px]"
+                tableClassName="min-w-[1320px]"
               >
                 {filteredPoItems.map((po) => (
                   <tr key={po.id} className="border-t border-slate-100 transition hover:bg-[#fafdfb]">
@@ -776,10 +806,21 @@ export function ProcureToPayPage({ initialTab = "memo" }: { initialTab?: Procure
                     <td className="px-4">{po.selectedVendorName ?? po.vendorName}</td>
                     <td className="px-4">{formatCurrency(po.amount)}</td>
                     <td className="px-4">
+                      {po.vendorDeliveryStatus ? (
+                        <StatusBadge label={po.vendorDeliveryStatus} className="min-h-7 min-w-0 px-2.5 text-[11px]" />
+                      ) : (
+                        <span className="text-sm text-slate-400">ยังไม่อัปเดต</span>
+                      )}
+                    </td>
+                    <td className="px-4 text-sm text-slate-500">{formatVendorUpdateTimestamp(po.vendorUpdatedAt)}</td>
+                    <td className="px-4">
                       <StatusBadge label={po.procurementStatus} className="min-h-7 min-w-0 px-2.5 text-[11px]" />
                     </td>
                     <td className="px-4 text-right">
                       <div className="flex justify-end gap-2">
+                        {getPoActionHref(po.id) ? (
+                          <ActionIconLink href={getPoActionHref(po.id) ?? "#"} icon={<Pencil className="h-4 w-4" />} title="อัปเดตสถานะ" />
+                        ) : null}
                         <ActionIconButton onClick={() => openDetail("po", po.id)} icon={<Eye className="h-4 w-4" />} title="ดูรายละเอียด" />
                       </div>
                     </td>
@@ -959,6 +1000,30 @@ export function ProcureToPayPage({ initialTab = "memo" }: { initialTab?: Procure
             </div>
 
             <div className={`${dashboardInnerCardClass} p-4`}>
+              <p className="font-semibold text-slate-900">สถานะจัดส่งจากร้านค้า</p>
+              <div className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                <InfoCard
+                  label="สถานะจัดส่ง"
+                  value={
+                    selectedPo.vendorDeliveryStatus ? (
+                      <StatusBadge label={selectedPo.vendorDeliveryStatus} className="min-h-7 min-w-0 px-2.5 text-[11px]" />
+                    ) : (
+                      "-"
+                    )
+                  }
+                />
+                <InfoCard label="อัปเดตล่าสุด" value={formatVendorUpdateTimestamp(selectedPo.vendorUpdatedAt)} />
+                <InfoCard label="Tracking Number" value={selectedPo.trackingNumber ?? "-"} />
+                <InfoCard label="กำหนดส่งถึง" value={selectedPo.expectedDeliveryDate ?? "-"} />
+              </div>
+              {selectedPo.vendorDeliveryNote ? (
+                <div className="mt-4 rounded-[18px] border border-slate-200 bg-white p-4 text-sm text-slate-600">
+                  {selectedPo.vendorDeliveryNote}
+                </div>
+              ) : null}
+            </div>
+
+            <div className={`${dashboardInnerCardClass} p-4`}>
               <p className="font-semibold text-slate-900">ลำดับสถานะ PO</p>
               <div className="mt-3 flex flex-wrap gap-2">
                 {["PO Created", "Sent to Vendor", "Pending Receiving", "Received", "QC Passed"].map((status) => (
@@ -972,6 +1037,25 @@ export function ProcureToPayPage({ initialTab = "memo" }: { initialTab?: Procure
                   >
                     {getStatusLabel(status)}
                   </span>
+                ))}
+              </div>
+            </div>
+
+            <div className={`${dashboardInnerCardClass} p-4`}>
+              <p className="font-semibold text-slate-900">Delivery Timeline</p>
+              <div className="mt-3 space-y-3">
+                {getVendorTimeline(selectedPo).map((event) => (
+                  <div
+                    key={`${selectedPo.id}-${event.label}`}
+                    className={`rounded-[18px] border px-4 py-3 ${
+                      event.complete ? "border-[#cfe1d7] bg-[#f4fbf7]" : "border-slate-200 bg-white"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between gap-3">
+                      <p className="font-medium text-slate-900">{event.label}</p>
+                      <span className="text-xs text-slate-400">{formatVendorUpdateTimestamp(event.date)}</span>
+                    </div>
+                  </div>
                 ))}
               </div>
             </div>

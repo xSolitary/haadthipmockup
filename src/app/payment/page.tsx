@@ -16,6 +16,7 @@ const formatCurrency = (value: number) =>
   }).format(value);
 
 export default function PaymentPage() {
+  const currentRole = useProcurementStore((state) => state.currentRole);
   const paymentRequests = useProcurementStore((state) => state.paymentRequests);
   const updatePaymentStatus = useProcurementStore((state) => state.updatePaymentStatus);
 
@@ -70,6 +71,19 @@ export default function PaymentPage() {
         : selectedPayment?.status === "Approved for Payment"
           ? "ทำเครื่องหมายว่า Paid"
           : "เสร็จสิ้น";
+
+  if (currentRole === "Vendor") {
+    return (
+      <div className="space-y-6">
+        <PageHeader title="จ่ายเงิน" subtitle="บทบาทร้านค้าไม่สามารถเข้าถึงหน้าการชำระเงินได้" />
+        <div className="rounded-[24px] border border-slate-200 bg-white p-6 shadow-sm shadow-slate-200/50">
+          <p className="text-sm text-slate-600">
+            หน้านี้สำหรับฝ่ายจัดซื้อและการเงินเท่านั้น ร้านค้าสามารถติดตามงานได้ที่หน้า PO และตรวจรับสินค้า
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">

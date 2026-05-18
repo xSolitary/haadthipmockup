@@ -90,6 +90,7 @@ const roleToDb: Record<Role, PrismaRole> = {
   Approver: PrismaRole.Approver,
   Purchasing: PrismaRole.Purchasing,
   Finance: PrismaRole.Finance,
+  Vendor: PrismaRole.Admin,
   Admin: PrismaRole.Admin,
 };
 

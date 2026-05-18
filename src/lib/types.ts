@@ -3,6 +3,7 @@ export type Role =
   | "Approver"
   | "Purchasing"
   | "Finance"
+  | "Vendor"
   | "Admin";
 
 export type MemoStatus =
@@ -43,6 +44,12 @@ export type ProcurementCategory =
   | "Fleet / Vehicle"
   | "IT / Office"
   | "Service / Contractor";
+
+export type VendorDeliveryStatus =
+  | "รับคำสั่งซื้อแล้ว"
+  | "กำลังเตรียมสินค้า"
+  | "อยู่ระหว่างจัดส่ง"
+  | "จัดส่งถึงปลายทางแล้ว";
 
 export type SiteName =
   | "Head Office"
@@ -175,6 +182,23 @@ export interface PurchaseOrder {
   poApprovalRequired?: boolean;
   vendorProposals: VendorProposal[];
   history: ApprovalHistory[];
+  vendorDeliveryStatus?: VendorDeliveryStatus;
+  vendorDeliveryNote?: string;
+  trackingNumber?: string;
+  expectedDeliveryDate?: string;
+  deliveredAt?: string;
+  vendorUpdatedAt?: string;
+}
+
+export interface VendorDeliveryUpdate {
+  poId: string;
+  vendorDeliveryStatus: VendorDeliveryStatus;
+  vendorDeliveryNote?: string;
+  trackingNumber?: string;
+  expectedDeliveryDate?: string;
+  deliveredAt?: string;
+  vendorUpdatedAt: string;
+  vendorName?: string;
 }
 
 export interface ReceivingRecord {
@@ -243,8 +267,9 @@ export interface ProcurementState extends CurrentStoreState {
   approvalHistory: ApprovalHistory[];
   receivingRecords: ReceivingRecord[];
   paymentRequests: PaymentRequest[];
+  vendorDeliveries: Record<string, VendorDeliveryUpdate>;
   login: (username: string, password: string) => { success: true } | { success: false; error: string };
-  loginAsRole: (role: Extract<Role, "Requester" | "Approver" | "Purchasing" | "Finance">) => void;
+  loginAsRole: (role: Extract<Role, "Requester" | "Approver" | "Purchasing" | "Finance" | "Vendor">) => void;
   logout: () => void;
   switchRole: (role: Role) => void;
   createMemo: (memo: Omit<MemoRequest, "id" | "documentNumber" | "createdAt" | "updatedAt" | "history" | "procurementStatus" | "status" | "assignedApproverId" | "currentApproverName" | "estimatedTotal">) => Promise<string>;
@@ -266,6 +291,7 @@ export interface ProcurementState extends CurrentStoreState {
   approvePO: (poApprovalId: string, comment: string) => Promise<void>;
   rejectPO: (poApprovalId: string, comment: string) => Promise<void>;
   sendToVendor: (poId: string) => Promise<void>;
+  updateVendorDelivery: (poId: string, updates: Omit<VendorDeliveryUpdate, "poId">) => void;
   receivePo: (poId: string, record: Partial<ReceivingRecord>) => Promise<void>;
   markQcPassed: (poId: string) => Promise<void>;
   updatePaymentStatus: (paymentId: string, status: PaymentRequest["status"]) => Promise<void>;

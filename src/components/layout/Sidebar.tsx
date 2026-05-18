@@ -2,17 +2,32 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BarChart3, ChevronLeft, ChevronRight, CreditCard, Home, Layers, LogOut, Settings, Truck } from "lucide-react";
+import {
+  BarChart3,
+  ChevronLeft,
+  ChevronRight,
+  CreditCard,
+  Home,
+  Layers,
+  LogOut,
+  Settings,
+  Truck,
+} from "lucide-react";
 import { useCurrentUserProfile } from "@/components/layout/useCurrentUserProfile";
+import { useProcurementStore } from "@/store/useProcurementStore";
 
-// Do not convert or re-encode Thai labels. Keep this file UTF-8.
-const navItems = [
+const defaultNavItems = [
   { label: "แดชบอร์ด", href: "/", icon: Home },
   { label: "ระบบจัดซื้อ", href: "/my-requests", icon: Layers },
   { label: "ตรวจรับสินค้า", href: "/receiving", icon: Truck },
   { label: "จ่ายเงิน", href: "/payment", icon: CreditCard },
   { label: "รายงาน", href: "/reports", icon: BarChart3 },
   { label: "ตั้งค่าระบบ", href: "/admin", icon: Settings },
+];
+
+const vendorNavItems = [
+  { label: "PO / งานจัดส่ง", href: "/my-requests?tab=po", icon: Layers },
+  { label: "ตรวจรับสินค้า", href: "/receiving", icon: Truck },
 ];
 
 function HaadthipWordmark({ isCollapsed }: { isCollapsed: boolean }) {
@@ -50,7 +65,9 @@ interface SidebarProps {
 
 export function Sidebar({ isCollapsed, onToggleCollapse }: SidebarProps) {
   const pathname = usePathname();
+  const currentRole = useProcurementStore((state) => state.currentRole);
   const { currentUser, initials, roleLabel, handleLogout } = useCurrentUserProfile();
+  const navItems = currentRole === "Vendor" ? vendorNavItems : defaultNavItems;
 
   return (
     <aside
@@ -86,7 +103,10 @@ export function Sidebar({ isCollapsed, onToggleCollapse }: SidebarProps) {
 
         <nav className="mt-3 flex-1 space-y-2">
           {navItems.map((item) => {
-            const isActive = pathname === item.href;
+            const isActive =
+              item.href.includes("?")
+                ? pathname === item.href.split("?")[0]
+                : pathname === item.href;
             const Icon = item.icon;
 
             return (
@@ -109,11 +129,7 @@ export function Sidebar({ isCollapsed, onToggleCollapse }: SidebarProps) {
                 >
                   <Icon className="h-[18px] w-[18px]" />
                 </span>
-                {!isCollapsed ? (
-                  <div className="min-w-0">
-                    <div>{item.label}</div>
-                  </div>
-                ) : null}
+                {!isCollapsed ? <div className="min-w-0">{item.label}</div> : null}
               </Link>
             );
           })}

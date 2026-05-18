@@ -29,6 +29,10 @@ const statusStyles: Record<string, string> = {
   "Ready for AP Posting": "border-slate-200 bg-slate-100 text-slate-700",
   "Approved for Payment": "border-emerald-200 bg-emerald-50 text-emerald-700",
   Paid: "border-slate-900 bg-slate-900 text-white",
+  "รับคำสั่งซื้อแล้ว": "border-emerald-200 bg-emerald-50 text-emerald-700",
+  "กำลังเตรียมสินค้า": "border-lime-200 bg-lime-50 text-lime-800",
+  "อยู่ระหว่างจัดส่ง": "border-sky-200 bg-sky-50 text-sky-700",
+  "จัดส่งถึงปลายทางแล้ว": "border-[#b6dfc9] bg-[#eef8f2] text-[#0d5738]",
 };
 
 interface StatusBadgeProps {

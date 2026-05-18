@@ -1,13 +1,19 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { BriefcaseBusiness, CheckCircle2, ShieldCheck, ShoppingCart } from "lucide-react";
+import {
+  BriefcaseBusiness,
+  CheckCircle2,
+  ShieldCheck,
+  ShoppingCart,
+  Store,
+} from "lucide-react";
 import type { Role } from "@/lib/types";
 import { getRoleLabel } from "@/lib/ui-text";
 import { useProcurementStore } from "@/store/useProcurementStore";
 
 const roleCards: Array<{
-  role: Extract<Role, "Requester" | "Approver" | "Purchasing">;
+  role: Extract<Role, "Requester" | "Approver" | "Purchasing" | "Vendor">;
   title: string;
   subtitle: string;
   icon: typeof BriefcaseBusiness;
@@ -30,15 +36,21 @@ const roleCards: Array<{
     subtitle: "เสนอ Vendor และดำเนินการ PR ต่อไปยัง PO",
     icon: ShoppingCart,
   },
+  {
+    role: "Vendor",
+    title: "ร้านค้า",
+    subtitle: "ดู PO ที่ได้รับมอบหมายและอัปเดตสถานะการจัดส่ง",
+    icon: Store,
+  },
 ];
 
 export function AuthGate() {
   const router = useRouter();
   const loginAsRole = useProcurementStore((state) => state.loginAsRole);
 
-  const handleSelectRole = (role: Extract<Role, "Requester" | "Approver" | "Purchasing">) => {
+  const handleSelectRole = (role: Extract<Role, "Requester" | "Approver" | "Purchasing" | "Vendor">) => {
     loginAsRole(role);
-    router.replace("/");
+    router.replace(role === "Vendor" ? "/my-requests?tab=po" : "/");
   };
 
   return (
@@ -67,7 +79,7 @@ export function AuthGate() {
           </div>
         </div>
 
-        <div className="mt-8 grid gap-5 lg:grid-cols-3">
+        <div className="mt-8 grid gap-5 lg:grid-cols-4">
           {roleCards.map(({ role, title, subtitle, icon: Icon }, index) => {
             const highlighted = index === 1;
 

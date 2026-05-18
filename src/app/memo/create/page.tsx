@@ -1,5 +1,22 @@
+"use client";
+
 import { MemoEditorPage } from "@/components/memo/MemoEditorPage";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { useProcurementStore } from "@/store/useProcurementStore";
 
 export default function CreateMemoPage() {
+  const currentRole = useProcurementStore((state) => state.currentRole);
+
+  if (currentRole === "Vendor") {
+    return (
+      <div className="space-y-6">
+        <PageHeader title="Create Memo" subtitle="บทบาทร้านค้าไม่สามารถสร้าง Memo ได้" />
+        <div className="rounded-[24px] border border-slate-200 bg-white p-6 shadow-sm shadow-slate-200/50">
+          <p className="text-sm text-slate-600">กรุณาใช้งานหน้า PO / งานจัดส่ง หรือหน้าตรวจรับสินค้าแทน</p>
+        </div>
+      </div>
+    );
+  }
+
   return <MemoEditorPage />;
 }

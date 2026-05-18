@@ -10,12 +10,14 @@ import {
   LogOut,
   Search,
   Siren,
+  Truck,
   UserRound,
 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useCurrentUserProfile } from "@/components/layout/useCurrentUserProfile";
 import { getActionNotifications, type NotificationIconKey } from "@/lib/notifications";
 import { loadFromStorage, saveToStorage } from "@/lib/storage";
+import { mergePurchaseOrderWithVendorDelivery } from "@/lib/vendor-delivery";
 import { useProcurementStore } from "@/store/useProcurementStore";
 
 const NOTIFICATION_READ_STORAGE_KEY = "ht-notification-read-state";
@@ -31,11 +33,11 @@ function NotificationIcon({ icon }: { icon: NotificationIconKey }) {
     case "urgent":
       return <Siren className="h-4 w-4" />;
     case "memo-approval":
-      return <ClipboardCheck className="h-4 w-4" />;
     case "vendor-approval":
       return <ClipboardCheck className="h-4 w-4" />;
-    case "vendor-proposal":
-      return <Bell className="h-4 w-4" />;
+    case "delivery-update":
+    case "delivery-arrived":
+      return <Truck className="h-4 w-4" />;
     default:
       return <Bell className="h-4 w-4" />;
   }
@@ -58,9 +60,19 @@ export function Topbar() {
   const currentUserId = useProcurementStore((state) => state.currentUserId);
   const memos = useProcurementStore((state) => state.memos);
   const purchaseOrders = useProcurementStore((state) => state.purchaseOrders);
+  const vendorDeliveries = useProcurementStore((state) => state.vendorDeliveries);
+  const mergedPurchaseOrders = useMemo(
+    () => purchaseOrders.map((po) => mergePurchaseOrderWithVendorDelivery(po, vendorDeliveries)),
+    [purchaseOrders, vendorDeliveries],
+  );
   const notificationScopeKey = currentRole && currentUserId ? `${currentRole}:${currentUserId}` : null;
   const clearedAt = notificationScopeKey ? readState[notificationScopeKey] : undefined;
-  const notifications = getActionNotifications({ currentRole, currentUserId, memos, purchaseOrders }).filter(
+  const notifications = getActionNotifications({
+    currentRole,
+    currentUserId,
+    memos,
+    purchaseOrders: mergedPurchaseOrders,
+  }).filter(
     (notification) => !clearedAt || new Date(notification.timestamp).getTime() > new Date(clearedAt).getTime(),
   );
   const notificationCount = notifications.length;
@@ -218,7 +230,7 @@ export function Topbar() {
                   <span className="inline-flex rounded-full bg-[var(--surface-tint)] px-2 py-1 font-medium text-[var(--primary-ink)]">
                     {roleLabel}
                   </span>
-                  <span className="truncate">{currentUser?.department ?? "จัดซื้อ"}</span>
+                  <span className="truncate">{currentUser?.department ?? "ฝ่ายจัดซื้อ"}</span>
                 </div>
               </div>
               <ChevronDown

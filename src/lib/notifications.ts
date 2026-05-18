@@ -1,13 +1,15 @@
-import type { MemoRequest, PurchaseOrder, ProcurementState, Role } from "@/lib/types";
+import type { MemoRequest, ProcurementState, PurchaseOrder, Role } from "@/lib/types";
 
-export type NotificationTab = "memo" | "pr";
+export type NotificationTab = "memo" | "pr" | "po";
 export type NotificationIconKey =
   | "revision"
   | "rejected"
   | "urgent"
   | "memo-approval"
   | "vendor-approval"
-  | "vendor-proposal";
+  | "vendor-proposal"
+  | "delivery-update"
+  | "delivery-arrived";
 
 export interface ActionNotification {
   id: string;
@@ -75,8 +77,20 @@ function getApproverMemoHref(memo: MemoRequest) {
   return `/memo/${memo.id}/action`;
 }
 
-function getVendorActionHref(po: PurchaseOrder) {
+function getVendorSelectionHref(po: PurchaseOrder) {
   return `/pr-po/${po.id}/action`;
+}
+
+function getVendorPoHref(po: PurchaseOrder) {
+  return `/pr-po/${po.id}/action`;
+}
+
+function getPoListHref() {
+  return "/my-requests?tab=po";
+}
+
+function getReceivingHref() {
+  return "/receiving";
 }
 
 export function getActionNotifications(
@@ -170,9 +184,33 @@ export function getActionNotifications(
           title: "รออนุมัติการเลือก Vendor",
           description: `${po.prNumber ?? po.documentNumber} • ${po.memoTitle}`,
           timeLabel: formatRelativeTime(po.updatedAt),
-          href: getVendorActionHref(po),
+          href: getVendorSelectionHref(po),
           tab: "pr" as const,
           timestamp: po.updatedAt,
+        })),
+    );
+
+    notifications.push(
+      ...purchaseOrders
+        .filter((po) => {
+          const sourceMemo = getSourceMemo(po, memos);
+          return sourceMemo?.assignedApproverId === currentUserId && Boolean(po.vendorUpdatedAt);
+        })
+        .map((po) => ({
+          id: `vendor-status-approver-${po.id}`,
+          icon:
+            po.vendorDeliveryStatus === "จัดส่งถึงปลายทางแล้ว"
+              ? ("delivery-arrived" as const)
+              : ("delivery-update" as const),
+          title:
+            po.vendorDeliveryStatus === "จัดส่งถึงปลายทางแล้ว"
+              ? "สินค้าถึงปลายทางแล้ว"
+              : "ร้านค้าอัปเดตสถานะจัดส่งของ PO ที่อนุมัติ",
+          description: `${po.poNumber ?? po.documentNumber} • ${po.vendorDeliveryStatus ?? "-"}`,
+          timeLabel: formatRelativeTime(po.vendorUpdatedAt ?? po.updatedAt),
+          href: po.vendorDeliveryStatus === "จัดส่งถึงปลายทางแล้ว" ? getReceivingHref() : getPoListHref(),
+          tab: "po" as const,
+          timestamp: po.vendorUpdatedAt ?? po.updatedAt,
         })),
     );
   }
@@ -187,9 +225,64 @@ export function getActionNotifications(
           title: "PR รอเสนอหรือคัดเลือก Vendor",
           description: `${po.prNumber ?? po.documentNumber} • ${po.memoTitle}`,
           timeLabel: formatRelativeTime(po.updatedAt),
-          href: getVendorActionHref(po),
+          href: getVendorSelectionHref(po),
           tab: "pr" as const,
           timestamp: po.updatedAt,
+        })),
+    );
+
+    notifications.push(
+      ...purchaseOrders
+        .filter((po) => Boolean(po.vendorUpdatedAt))
+        .map((po) => ({
+          id: `vendor-status-purchasing-${po.id}`,
+          icon:
+            po.vendorDeliveryStatus === "จัดส่งถึงปลายทางแล้ว"
+              ? ("delivery-arrived" as const)
+              : ("delivery-update" as const),
+          title:
+            po.vendorDeliveryStatus === "จัดส่งถึงปลายทางแล้ว"
+              ? "สินค้าถึงปลายทาง รอตรวจรับ"
+              : "ร้านค้าอัปเดตสถานะจัดส่ง",
+          description: `${po.poNumber ?? po.documentNumber} • ${po.vendorDeliveryStatus ?? "-"}`,
+          timeLabel: formatRelativeTime(po.vendorUpdatedAt ?? po.updatedAt),
+          href: po.vendorDeliveryStatus === "จัดส่งถึงปลายทางแล้ว" ? getReceivingHref() : getPoListHref(),
+          tab: "po" as const,
+          timestamp: po.vendorUpdatedAt ?? po.updatedAt,
+        })),
+    );
+  }
+
+  if (currentRole === "Vendor") {
+    notifications.push(
+      ...purchaseOrders
+        .filter((po) => Boolean(po.selectedVendorName))
+        .map((po) => ({
+          id: `vendor-new-po-${po.id}`,
+          icon: "vendor-proposal" as const,
+          title: "PO ใหม่ที่ต้องดำเนินการจัดส่ง",
+          description: `${po.poNumber ?? po.documentNumber} • ${po.memoTitle}`,
+          timeLabel: formatRelativeTime(po.updatedAt),
+          href: getVendorPoHref(po),
+          tab: "po" as const,
+          timestamp: po.updatedAt,
+        })),
+    );
+
+    notifications.push(
+      ...purchaseOrders
+        .filter(
+          (po) => Boolean(po.selectedVendorName) && po.vendorDeliveryStatus !== "จัดส่งถึงปลายทางแล้ว",
+        )
+        .map((po) => ({
+          id: `vendor-followup-${po.id}`,
+          icon: "delivery-update" as const,
+          title: "PO ที่ต้องอัปเดตสถานะ",
+          description: `${po.poNumber ?? po.documentNumber} • ${po.vendorDeliveryStatus ?? "ยังไม่อัปเดต"}`,
+          timeLabel: formatRelativeTime(po.vendorUpdatedAt ?? po.updatedAt),
+          href: getVendorPoHref(po),
+          tab: "po" as const,
+          timestamp: po.vendorUpdatedAt ?? po.updatedAt,
         })),
     );
   }

@@ -9,6 +9,7 @@ import type {
   ProcurementState,
   ReceivingRecord,
   Role,
+  VendorDeliveryUpdate,
   VendorProposal,
 } from "@/lib/types";
 import type { BootstrapData } from "@/lib/server/procurement";
@@ -19,16 +20,14 @@ const noopStorage: StateStorage = {
   removeItem: () => undefined,
 };
 
-const allowedLoginRoles: Array<Extract<Role, "Requester" | "Approver" | "Purchasing" | "Finance">> = [
-  "Requester",
-  "Approver",
-  "Purchasing",
-  "Finance",
-];
+const allowedLoginRoles: Array<
+  Extract<Role, "Requester" | "Approver" | "Purchasing" | "Finance" | "Vendor">
+> = ["Requester", "Approver", "Purchasing", "Finance", "Vendor"];
 
 function getBaseState() {
   return {
     ...initialStoreState,
+    vendorDeliveries: {},
     isSyncing: false,
   } as unknown as Omit<
     ProcurementState,
@@ -56,6 +55,7 @@ function getBaseState() {
     | "approvePO"
     | "rejectPO"
     | "sendToVendor"
+    | "updateVendorDelivery"
     | "receivePo"
     | "markQcPassed"
     | "updatePaymentStatus"
@@ -66,9 +66,19 @@ function getUserForRole(state: ProcurementState, role: Role) {
   return state.users.find((user) => user.role === role) ?? state.users[0];
 }
 
+function mergeVendorUser(users: ProcurementState["users"]) {
+  const vendorUser = initialStoreState.users.find((user) => user.role === "Vendor");
+  if (!vendorUser) {
+    return users;
+  }
+
+  const filteredUsers = users.filter((user) => user.id !== vendorUser.id);
+  return [...filteredUsers, vendorUser];
+}
+
 function patchBootstrapData(set: (partial: Partial<ProcurementState>) => void, data: BootstrapData) {
   set({
-    users: data.users,
+    users: mergeVendorUser(data.users),
     memos: data.memos,
     vendors: data.vendors,
     purchaseOrders: data.purchaseOrders,
@@ -147,7 +157,7 @@ export const useProcurementStore = create<ProcurementState>()(
           currentUserId: user?.id ?? defaultUserId,
           currentUsername: role.toLowerCase(),
           isAuthenticated: allowedLoginRoles.includes(
-            role as Extract<Role, "Requester" | "Approver" | "Purchasing" | "Finance">,
+            role as Extract<Role, "Requester" | "Approver" | "Purchasing" | "Finance" | "Vendor">,
           ),
         });
       },
@@ -297,6 +307,22 @@ export const useProcurementStore = create<ProcurementState>()(
       approvePO: async () => undefined,
       rejectPO: async () => undefined,
       sendToVendor: async () => undefined,
+      updateVendorDelivery: (poId, updates) => {
+        set((state) => {
+          const current = state.vendorDeliveries[poId];
+          const nextEntry: VendorDeliveryUpdate = {
+            poId,
+            ...updates,
+          };
+
+          return {
+            vendorDeliveries: {
+              ...state.vendorDeliveries,
+              [poId]: current ? { ...current, ...nextEntry } : nextEntry,
+            },
+          };
+        });
+      },
       receivePo: async (poId, record: Partial<ReceivingRecord>) => {
         const response = await apiFetch<{ data: BootstrapData }>(
           `/api/purchase-orders/${poId}/receive`,
@@ -329,7 +355,7 @@ export const useProcurementStore = create<ProcurementState>()(
     }),
     {
       name: "ht-procurement-store",
-      version: 3,
+      version: 4,
       storage: createJSONStorage(() =>
         typeof window === "undefined" ? noopStorage : window.localStorage,
       ),
@@ -338,6 +364,7 @@ export const useProcurementStore = create<ProcurementState>()(
         currentUserId: state.currentUserId,
         currentUsername: state.currentUsername,
         isAuthenticated: state.isAuthenticated,
+        vendorDeliveries: state.vendorDeliveries,
       }),
       merge: (persistedState, currentState) => ({
         ...currentState,

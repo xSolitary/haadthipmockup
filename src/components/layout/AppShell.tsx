@@ -25,6 +25,7 @@ export function AppShell({ children }: AppShellProps) {
     return loadFromStorage<boolean>(SIDEBAR_COLLAPSED_STORAGE_KEY, false);
   });
   const isAuthenticated = useProcurementStore((state) => state.isAuthenticated);
+  const currentRole = useProcurementStore((state) => state.currentRole);
   const initializeData = useProcurementStore((state) => state.initializeData);
   const isLoginRoute = pathname === "/login";
 
@@ -51,9 +52,9 @@ export function AppShell({ children }: AppShellProps) {
     }
 
     if (isAuthenticated && isLoginRoute) {
-      router.replace("/");
+      router.replace(currentRole === "Vendor" ? "/my-requests?tab=po" : "/");
     }
-  }, [hasHydrated, isAuthenticated, isLoginRoute, router]);
+  }, [currentRole, hasHydrated, isAuthenticated, isLoginRoute, router]);
 
   useEffect(() => {
     if (!hasHydrated || !isAuthenticated) {
