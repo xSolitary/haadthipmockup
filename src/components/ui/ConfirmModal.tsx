@@ -7,6 +7,7 @@ interface ConfirmModalProps {
   description?: string;
   confirmLabel?: string;
   cancelLabel?: string;
+  confirmVariant?: "primary" | "danger";
   onConfirm: () => void;
   onCancel: () => void;
 }
@@ -17,9 +18,15 @@ export function ConfirmModal({
   description = "",
   confirmLabel = "ยืนยัน",
   cancelLabel = "ยกเลิก",
+  confirmVariant = "primary",
   onConfirm,
   onCancel,
 }: ConfirmModalProps) {
+  const confirmButtonClassName =
+    confirmVariant === "danger"
+      ? "inline-flex min-w-32 items-center justify-center rounded-2xl bg-rose-600 px-5 py-3 text-sm font-semibold text-white shadow-[0_14px_28px_rgba(225,29,72,0.22)] transition hover:bg-rose-700"
+      : "inline-flex min-w-32 items-center justify-center rounded-2xl bg-[#007946] px-5 py-3 text-sm font-semibold text-white shadow-[0_14px_28px_rgba(0,121,70,0.22)] transition hover:bg-[#00663b]";
+
   return (
     <ActionModalFrame
       open={open}
@@ -39,7 +46,7 @@ export function ConfirmModal({
         <button
           type="button"
           onClick={onConfirm}
-          className="inline-flex min-w-32 items-center justify-center rounded-2xl bg-[#007946] px-5 py-3 text-sm font-semibold text-white shadow-[0_14px_28px_rgba(0,121,70,0.22)] transition hover:bg-[#00663b]"
+          className={confirmButtonClassName}
         >
           {confirmLabel}
         </button>

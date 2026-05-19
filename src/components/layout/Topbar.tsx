@@ -17,14 +17,26 @@ import {
 import { useEffect, useMemo, useRef, useState } from "react";
 import { usePageHeaderContext } from "@/components/layout/PageHeaderContext";
 import { useCurrentUserProfile } from "@/components/layout/useCurrentUserProfile";
-import { getActionNotifications, type NotificationIconKey } from "@/lib/notifications";
+import {
+  getActionNotifications,
+  type ActionNotification,
+  type NotificationIconKey,
+} from "@/lib/notifications";
 import { loadFromStorage, saveToStorage } from "@/lib/storage";
 import { mergePurchaseOrderWithVendorDelivery } from "@/lib/vendor-delivery";
 import { useProcurementStore } from "@/store/useProcurementStore";
 
 const NOTIFICATION_READ_STORAGE_KEY = "ht-notification-read-state";
 
-type NotificationReadState = Record<string, string>;
+type NotificationReadRecord = {
+  isRead: boolean;
+  notificationTimestamp: string;
+  readAt: string;
+};
+
+type ScopedNotificationReadState = Record<string, NotificationReadRecord>;
+type NotificationReadState = Record<string, ScopedNotificationReadState>;
+type NotificationListItem = ActionNotification & { isRead: boolean };
 
 function NotificationIcon({ icon }: { icon: NotificationIconKey }) {
   switch (icon) {
@@ -64,22 +76,41 @@ export function Topbar() {
   const currentUserId = useProcurementStore((state) => state.currentUserId);
   const memos = useProcurementStore((state) => state.memos);
   const purchaseOrders = useProcurementStore((state) => state.purchaseOrders);
+  const paymentRequests = useProcurementStore((state) => state.paymentRequests);
   const vendorDeliveries = useProcurementStore((state) => state.vendorDeliveries);
   const mergedPurchaseOrders = useMemo(
     () => purchaseOrders.map((po) => mergePurchaseOrderWithVendorDelivery(po, vendorDeliveries)),
     [purchaseOrders, vendorDeliveries],
   );
   const notificationScopeKey = currentRole && currentUserId ? `${currentRole}:${currentUserId}` : null;
-  const clearedAt = notificationScopeKey ? readState[notificationScopeKey] : undefined;
-  const notifications = getActionNotifications({
-    currentRole,
-    currentUserId,
-    memos,
-    purchaseOrders: mergedPurchaseOrders,
-  }).filter(
-    (notification) => !clearedAt || new Date(notification.timestamp).getTime() > new Date(clearedAt).getTime(),
+  const scopedReadState = useMemo(
+    () => (notificationScopeKey ? readState[notificationScopeKey] ?? {} : {}),
+    [notificationScopeKey, readState],
   );
-  const notificationCount = notifications.length;
+  const notifications = useMemo<NotificationListItem[]>(
+    () =>
+      getActionNotifications({
+        currentRole,
+        currentUserId,
+        memos,
+        purchaseOrders: mergedPurchaseOrders,
+        paymentRequests,
+      })
+        .filter((notification) => !notification.completed)
+        .map((notification) => {
+          const readRecord = scopedReadState[notification.id];
+          const isRead = Boolean(
+            readRecord?.isRead && readRecord.notificationTimestamp === notification.timestamp,
+          );
+
+          return {
+            ...notification,
+            isRead,
+          };
+        }),
+    [currentRole, currentUserId, memos, mergedPurchaseOrders, paymentRequests, scopedReadState],
+  );
+  const notificationCount = notifications.filter((notification) => !notification.isRead).length;
   const activePageHeader = pageHeader?.pathname === pathname ? pageHeader : null;
 
   useEffect(() => {
@@ -112,19 +143,52 @@ export function Topbar() {
     };
   }, [isMenuOpen, isNotificationOpen]);
 
+  const persistReadState = (nextState: NotificationReadState) => {
+    setReadState(nextState);
+    saveToStorage(NOTIFICATION_READ_STORAGE_KEY, nextState);
+  };
+
+  const markNotificationAsRead = (notification: ActionNotification) => {
+    if (!notificationScopeKey) {
+      return;
+    }
+
+    const scopeState = readState[notificationScopeKey] ?? {};
+    const nextState = {
+      ...readState,
+      [notificationScopeKey]: {
+        ...scopeState,
+        [notification.id]: {
+          isRead: true,
+          notificationTimestamp: notification.timestamp,
+          readAt: new Date().toISOString(),
+        },
+      },
+    };
+
+    persistReadState(nextState);
+  };
+
   const handleMarkAllAsRead = () => {
     if (!notificationScopeKey) {
       setIsNotificationOpen(false);
       return;
     }
 
-    const nextState = {
-      ...readState,
-      [notificationScopeKey]: new Date().toISOString(),
-    };
+    const readAt = new Date().toISOString();
+    const scopeState = notifications.reduce<ScopedNotificationReadState>((accumulator, notification) => {
+      accumulator[notification.id] = {
+        isRead: true,
+        notificationTimestamp: notification.timestamp,
+        readAt,
+      };
+      return accumulator;
+    }, { ...(readState[notificationScopeKey] ?? {}) });
 
-    setReadState(nextState);
-    saveToStorage(NOTIFICATION_READ_STORAGE_KEY, nextState);
+    persistReadState({
+      ...readState,
+      [notificationScopeKey]: scopeState,
+    });
     setIsNotificationOpen(false);
   };
 
@@ -209,21 +273,42 @@ export function Topbar() {
                       <Link
                         key={notification.id}
                         href={notification.href}
-                        onClick={() => setIsNotificationOpen(false)}
-                        className="flex items-start gap-3 rounded-[24px] px-3 py-3 transition hover:bg-[#f4fbf7]"
+                        onClick={() => {
+                          markNotificationAsRead(notification);
+                          setIsNotificationOpen(false);
+                        }}
+                        className={`flex items-start gap-3 rounded-[24px] px-3 py-3 transition ${
+                          notification.isRead ? "opacity-85 hover:bg-slate-50" : "bg-[#fcfefd] hover:bg-[#f4fbf7]"
+                        }`}
                       >
-                        <div className="mt-0.5 flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[#eef8f2] text-[#007946]">
+                        <div
+                          className={`mt-0.5 flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl text-[#007946] ${
+                            notification.isRead ? "bg-[#f5f8f6]" : "bg-[#eef8f2]"
+                          }`}
+                        >
                           <NotificationIcon icon={notification.icon} />
                         </div>
                         <div className="min-w-0 flex-1">
                           <div className="flex items-start justify-between gap-3">
                             <div className="min-w-0">
-                              <p className="truncate text-sm font-semibold text-slate-900">{notification.title}</p>
-                              <p className="mt-1 line-clamp-2 text-sm leading-5 text-slate-500">
+                              <p
+                                className={`truncate text-sm ${
+                                  notification.isRead ? "font-medium text-slate-700" : "font-semibold text-slate-900"
+                                }`}
+                              >
+                                {notification.title}
+                              </p>
+                              <p
+                                className={`mt-1 line-clamp-2 text-sm leading-5 ${
+                                  notification.isRead ? "text-slate-400" : "text-slate-500"
+                                }`}
+                              >
                                 {notification.description}
                               </p>
                             </div>
-                            <span className="mt-1 h-2.5 w-2.5 shrink-0 rounded-full bg-[#d92d20]" />
+                            {!notification.isRead ? (
+                              <span className="mt-1 h-2.5 w-2.5 shrink-0 rounded-full bg-[#d92d20]" />
+                            ) : null}
                           </div>
                           <p className="mt-2 text-xs font-medium text-slate-400">{notification.timeLabel}</p>
                         </div>

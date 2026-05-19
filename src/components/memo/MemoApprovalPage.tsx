@@ -295,7 +295,7 @@ export function MemoApprovalPage({ memoId }: { memoId: string }) {
                 type="button"
                 onClick={() => openConfirm("reject")}
                 disabled={!comment.trim()}
-                className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-xl bg-amber-500 px-4 text-sm font-semibold text-white transition hover:bg-amber-600 disabled:cursor-not-allowed disabled:bg-amber-300"
+                className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-xl bg-rose-600 px-4 text-sm font-semibold text-white transition hover:bg-rose-700 disabled:cursor-not-allowed disabled:bg-rose-300"
               >
                 <XCircle className="h-4 w-4" /> ปฏิเสธ
               </button>
@@ -339,6 +339,7 @@ export function MemoApprovalPage({ memoId }: { memoId: string }) {
       />
       <ConfirmModal
         open={confirmAction === "reject"}
+        confirmVariant="danger"
         title="ยืนยันปฏิเสธ Memo?"
         description="เหตุผลนี้จะถูกบันทึกในประวัติ Memo และแสดงให้ผู้ขอซื้อเห็น"
         confirmLabel="ปฏิเสธ"
