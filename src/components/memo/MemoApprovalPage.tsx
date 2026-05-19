@@ -54,7 +54,7 @@ export function MemoApprovalPage({ memoId }: { memoId: string }) {
   const closeResultModal = () => {
     setIsCompletingAction(false);
     setSuccessModal(defaultSuccessModalState);
-    router.push("/my-requests?tab=memo");
+    router.push(`/my-requests?tab=memo&highlightId=${memoId}`);
   };
 
   const handleAction = async (action: "approve" | "reject") => {
@@ -68,7 +68,12 @@ export function MemoApprovalPage({ memoId }: { memoId: string }) {
       setSuccessModal({
         open: true,
         title: "อนุมัติ Memo สำเร็จ",
-        description: "ระบบได้บันทึกการอนุมัติ Memo เรียบร้อยแล้ว",
+        description: (
+          <div className="space-y-2 text-center">
+            <p>ระบบได้บันทึกการอนุมัติ Memo เรียบร้อยแล้ว</p>
+            <p>ระบบกำลังพากลับไปหน้าระบบจัดซื้อ</p>
+          </div>
+        ),
         variant: "success",
       });
       return;
@@ -82,6 +87,7 @@ export function MemoApprovalPage({ memoId }: { memoId: string }) {
         <div className="space-y-2 text-center">
           <p>ระบบได้ส่ง Memo กลับไปให้ผู้ขอซื้อแก้ไขแล้ว</p>
           {trimmedComment ? <p className="font-medium text-slate-700">เหตุผล: {trimmedComment}</p> : null}
+          <p>ระบบกำลังพากลับไปหน้าระบบจัดซื้อ</p>
         </div>
       ),
       variant: "warning",

@@ -1,6 +1,7 @@
 ﻿"use client";
 
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
 import { useEffect, useMemo, useState } from "react";
 import { Download, Eye, Pencil, Plus, Search, X } from "lucide-react";
@@ -27,6 +28,15 @@ type PreviewState =
   | { type: "pr"; id: string }
   | { type: "po"; id: string }
   | null;
+type SortOption = "latest" | "oldest" | "document" | "status" | "amount-desc" | "amount-asc";
+type PoDeliveryFilter =
+  | "all"
+  | "รับคำสั่งซื้อแล้ว"
+  | "กำลังเตรียมสินค้า"
+  | "อยู่ระหว่างจัดส่ง"
+  | "จัดส่งถึงปลายทางแล้ว"
+  | "รอรับสินค้า"
+  | "ผ่าน QC";
 
 const formatCurrency = (value: number) =>
   new Intl.NumberFormat("th-TH", { style: "currency", currency: "THB", maximumFractionDigits: 0 }).format(value);
@@ -43,6 +53,54 @@ const dashboardShellClass = "rounded-[30px] border border-[var(--border)] bg-[va
 const dashboardInnerCardClass = "rounded-[22px] border border-[var(--border)] bg-[var(--surface-strong)] shadow-[var(--shadow-sm)]";
 const dashboardControlClass =
   "h-11 rounded-[18px] border border-[var(--border)] bg-[var(--surface)] text-sm text-slate-700 shadow-[var(--shadow-sm)] transition focus:outline-none focus:ring-0";
+const poDeliveryFilterOptions: PoDeliveryFilter[] = [
+  "all",
+  "รับคำสั่งซื้อแล้ว",
+  "กำลังเตรียมสินค้า",
+  "อยู่ระหว่างจัดส่ง",
+  "จัดส่งถึงปลายทางแล้ว",
+  "รอรับสินค้า",
+  "ผ่าน QC",
+];
+const sortOptions: Array<{ value: SortOption; label: string }> = [
+  { value: "latest", label: "ล่าสุด" },
+  { value: "oldest", label: "เก่าสุด" },
+  { value: "document", label: "เลขที่เอกสาร" },
+  { value: "status", label: "สถานะ" },
+  { value: "amount-desc", label: "ยอดเงินมากไปน้อย" },
+  { value: "amount-asc", label: "ยอดเงินน้อยไปมาก" },
+];
+
+function getPoDisplayStatus(po: PurchaseOrder) {
+  if (po.vendorDeliveryStatus) {
+    return po.vendorDeliveryStatus;
+  }
+
+  if (po.procurementStatus === "Pending Receiving") {
+    return "รอรับสินค้า";
+  }
+
+  if (po.procurementStatus === "QC Passed") {
+    return "ผ่าน QC";
+  }
+
+  return null;
+}
+
+function compareText(a: string, b: string) {
+  return a.localeCompare(b, "th");
+}
+
+function compareDate(a?: string, b?: string, direction: "asc" | "desc" = "desc") {
+  const left = a ? new Date(a).getTime() : 0;
+  const right = b ? new Date(b).getTime() : 0;
+
+  return direction === "asc" ? left - right : right - left;
+}
+
+function getPoTimestamp(po: PurchaseOrder) {
+  return po.vendorUpdatedAt ?? po.updatedAt;
+}
 
 function SummaryTabCard({
   active,
@@ -412,7 +470,14 @@ function matchesPoSearch(po: PurchaseOrder, searchTerm: string) {
     .includes(query);
 }
 
-export function ProcureToPayPage({ initialTab = "memo" }: { initialTab?: ProcureTab }) {
+export function ProcureToPayPage({
+  initialTab = "memo",
+  initialHighlightId = null,
+}: {
+  initialTab?: ProcureTab;
+  initialHighlightId?: string | null;
+}) {
+  const pathname = usePathname();
   const currentRole = useProcurementStore((state) => state.currentRole);
   const currentUserId = useProcurementStore((state) => state.currentUserId);
   const memos = useProcurementStore((state) => state.memos);
@@ -424,6 +489,8 @@ export function ProcureToPayPage({ initialTab = "memo" }: { initialTab?: Procure
   const [previewState, setPreviewState] = useState<PreviewState>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [sortOption, setSortOption] = useState<SortOption>("latest");
+  const [highlightedId, setHighlightedId] = useState<string | null>(initialHighlightId);
 
   const mergedPurchaseOrders = useMemo(
     () => purchaseOrders.map((po) => mergePurchaseOrderWithVendorDelivery(po, vendorDeliveries)),
@@ -529,6 +596,24 @@ export function ProcureToPayPage({ initialTab = "memo" }: { initialTab?: Procure
   const visibleTabs = tabMeta.filter((tab) => availableTabs.includes(tab.id));
   const currentTab = availableTabs.includes(activeTab) ? activeTab : availableTabs[0];
 
+  useEffect(() => {
+    if (!initialHighlightId) {
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      setHighlightedId(null);
+    }, 2800);
+
+    const url = new URL(window.location.href);
+    url.searchParams.delete("highlightId");
+    window.history.replaceState({}, "", `${url.pathname}${url.search}${url.hash}`);
+
+    return () => {
+      window.clearTimeout(timer);
+    };
+  }, [initialHighlightId, pathname]);
+
   const filteredMemoRequests = useMemo(
     () =>
       memoRequests.filter(
@@ -548,9 +633,83 @@ export function ProcureToPayPage({ initialTab = "memo" }: { initialTab?: Procure
   const filteredPoItems = useMemo(
     () =>
       poItems.filter(
-        (po) => matchesPoSearch(po, searchTerm) && (statusFilter === "all" || po.procurementStatus === statusFilter),
+        (po) =>
+          matchesPoSearch(po, searchTerm) &&
+          (statusFilter === "all" || getPoDisplayStatus(po) === statusFilter || po.procurementStatus === statusFilter),
       ),
     [poItems, searchTerm, statusFilter],
+  );
+
+  const sortedMemoRequests = useMemo(
+    () =>
+      [...filteredMemoRequests].sort((a, b) => {
+        switch (sortOption) {
+          case "oldest":
+            return compareDate(a.updatedAt, b.updatedAt, "asc");
+          case "document":
+            return compareText(a.documentNumber, b.documentNumber);
+          case "status":
+            return compareText(getStatusLabel(a.status), getStatusLabel(b.status));
+          case "amount-desc":
+            return b.estimatedTotal - a.estimatedTotal;
+          case "amount-asc":
+            return a.estimatedTotal - b.estimatedTotal;
+          case "latest":
+          default:
+            return compareDate(a.updatedAt, b.updatedAt, "desc");
+        }
+      }),
+    [filteredMemoRequests, sortOption],
+  );
+
+  const sortedPrItems = useMemo(
+    () =>
+      [...filteredPrItems].sort((a, b) => {
+        const leftAmount = memoById.get(a.memoId)?.estimatedTotal ?? a.amount;
+        const rightAmount = memoById.get(b.memoId)?.estimatedTotal ?? b.amount;
+
+        switch (sortOption) {
+          case "oldest":
+            return compareDate(a.updatedAt, b.updatedAt, "asc");
+          case "document":
+            return compareText(a.prNumber ?? a.documentNumber, b.prNumber ?? b.documentNumber);
+          case "status":
+            return compareText(getStatusLabel(a.procurementStatus), getStatusLabel(b.procurementStatus));
+          case "amount-desc":
+            return rightAmount - leftAmount;
+          case "amount-asc":
+            return leftAmount - rightAmount;
+          case "latest":
+          default:
+            return compareDate(a.updatedAt, b.updatedAt, "desc");
+        }
+      }),
+    [filteredPrItems, memoById, sortOption],
+  );
+
+  const sortedPoItems = useMemo(
+    () =>
+      [...filteredPoItems].sort((a, b) => {
+        switch (sortOption) {
+          case "oldest":
+            return compareDate(getPoTimestamp(a), getPoTimestamp(b), "asc");
+          case "document":
+            return compareText(a.poNumber ?? a.documentNumber, b.poNumber ?? b.documentNumber);
+          case "status":
+            return compareText(
+              getStatusLabel(getPoDisplayStatus(a) ?? a.procurementStatus),
+              getStatusLabel(getPoDisplayStatus(b) ?? b.procurementStatus),
+            );
+          case "amount-desc":
+            return b.amount - a.amount;
+          case "amount-asc":
+            return a.amount - b.amount;
+          case "latest":
+          default:
+            return compareDate(getPoTimestamp(a), getPoTimestamp(b), "desc");
+        }
+      }),
+    [filteredPoItems, sortOption],
   );
 
   const statusOptions = useMemo(() => {
@@ -559,9 +718,9 @@ export function ProcureToPayPage({ initialTab = "memo" }: { initialTab?: Procure
         ? memoRequests.map((memo) => memo.status)
         : currentTab === "pr"
           ? prItems.map((po) => po.procurementStatus)
-          : poItems.map((po) => po.procurementStatus);
+          : poDeliveryFilterOptions.filter((option) => option !== "all");
     return [...new Set(values)];
-  }, [currentTab, memoRequests, poItems, prItems]);
+  }, [currentTab, memoRequests, prItems]);
 
   const hasBaseItems = currentTab === "memo" ? memoRequests.length > 0 : currentTab === "pr" ? prItems.length > 0 : poItems.length > 0;
 
@@ -608,6 +767,7 @@ export function ProcureToPayPage({ initialTab = "memo" }: { initialTab?: Procure
     setActiveTab(tab);
     setSearchTerm("");
     setStatusFilter("all");
+    setSortOption("latest");
   };
 
   const canCreateMemo = currentRole === "Requester";
@@ -648,8 +808,7 @@ export function ProcureToPayPage({ initialTab = "memo" }: { initialTab?: Procure
       <PageHeader
         title="ระบบจัดซื้อจัดจ้าง"
         subtitle="รวม Memo, PR และ PO ในกระบวนการจัดซื้อ"
-        className="px-5 py-6 sm:px-6"
-        contentClassName="gap-3"
+        badge="ระบบจัดซื้อ"
       />
 
       <section className={`${dashboardShellClass} p-4 sm:p-5`}>
@@ -667,7 +826,7 @@ export function ProcureToPayPage({ initialTab = "memo" }: { initialTab?: Procure
         </div>
 
         <div className={`mt-4 flex flex-col gap-3 border-t border-[var(--border)] pt-4 xl:flex-row xl:items-center xl:justify-between ${dashboardInnerCardClass} p-4`}>
-          <div className="flex flex-1 flex-col gap-3 lg:flex-row">
+          <div className="flex flex-1 flex-col gap-3 xl:flex-row">
             <label className="relative block w-full lg:max-w-sm">
               <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
               <input
@@ -683,10 +842,22 @@ export function ProcureToPayPage({ initialTab = "memo" }: { initialTab?: Procure
               onChange={(event) => setStatusFilter(event.target.value)}
               className={`${dashboardControlClass} w-full px-3 lg:w-56`}
             >
-              <option value="all">ทุก Status</option>
+              <option value="all">{currentTab === "po" ? "ทั้งหมด" : "ทุกสถานะ"}</option>
               {statusOptions.map((status) => (
                 <option key={status} value={status}>
                   {getStatusLabel(status)}
+                </option>
+              ))}
+            </select>
+
+            <select
+              value={sortOption}
+              onChange={(event) => setSortOption(event.target.value as SortOption)}
+              className={`${dashboardControlClass} w-full px-3 lg:w-56`}
+            >
+              {sortOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
                 </option>
               ))}
             </select>
@@ -721,8 +892,11 @@ export function ProcureToPayPage({ initialTab = "memo" }: { initialTab?: Procure
                 bodyClassName="[&_td]:py-3"
                 tableClassName="min-w-[920px]"
               >
-                {filteredMemoRequests.map((memo) => (
-                  <tr key={memo.id} className="border-t border-slate-100 transition hover:bg-[#fafdfb]">
+                {sortedMemoRequests.map((memo) => (
+                  <tr
+                    key={memo.id}
+                    className={`border-t border-slate-100 transition hover:bg-[#fafdfb] ${highlightedId === memo.id ? "soft-highlight" : ""}`}
+                  >
                     <td className="px-4 text-slate-700">{memo.documentNumber}</td>
                     <td className="px-4 font-medium text-slate-900">{memo.title}</td>
                     <td className="px-4">{memo.site}</td>
@@ -760,8 +934,11 @@ export function ProcureToPayPage({ initialTab = "memo" }: { initialTab?: Procure
                 bodyClassName="[&_td]:py-3"
                 tableClassName="min-w-[1040px]"
               >
-                {filteredPrItems.map((po) => (
-                  <tr key={po.id} className="border-t border-slate-100 transition hover:bg-[#fafdfb]">
+                {sortedPrItems.map((po) => (
+                  <tr
+                    key={po.id}
+                    className={`border-t border-slate-100 transition hover:bg-[#fafdfb] ${highlightedId === po.id ? "soft-highlight" : ""}`}
+                  >
                     <td className="px-4 text-slate-700">{po.prNumber ?? po.documentNumber}</td>
                     <td className="px-4 font-medium text-slate-900">{po.memoTitle}</td>
                     <td className="px-4">{po.vendorProposals.length}</td>
@@ -799,15 +976,21 @@ export function ProcureToPayPage({ initialTab = "memo" }: { initialTab?: Procure
                 bodyClassName="[&_td]:py-3"
                 tableClassName="min-w-[1320px]"
               >
-                {filteredPoItems.map((po) => (
-                  <tr key={po.id} className="border-t border-slate-100 transition hover:bg-[#fafdfb]">
+                {sortedPoItems.map((po) => (
+                  <tr
+                    key={po.id}
+                    className={`border-t border-slate-100 transition hover:bg-[#fafdfb] ${highlightedId === po.id ? "soft-highlight" : ""}`}
+                  >
                     <td className="px-4 text-slate-700">{po.poNumber ?? po.documentNumber}</td>
                     <td className="px-4 font-medium text-slate-900">{po.memoTitle}</td>
                     <td className="px-4">{po.selectedVendorName ?? po.vendorName}</td>
                     <td className="px-4">{formatCurrency(po.amount)}</td>
                     <td className="px-4">
-                      {po.vendorDeliveryStatus ? (
-                        <StatusBadge label={po.vendorDeliveryStatus} className="min-h-7 min-w-0 px-2.5 text-[11px]" />
+                      {getPoDisplayStatus(po) ? (
+                        <StatusBadge
+                          label={getPoDisplayStatus(po) ?? po.procurementStatus}
+                          className="min-h-7 min-w-0 px-2.5 text-[11px]"
+                        />
                       ) : (
                         <span className="text-sm text-slate-400">ยังไม่อัปเดต</span>
                       )}

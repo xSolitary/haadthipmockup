@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { StatusBadge } from "@/components/ui/StatusBadge";
@@ -52,6 +52,7 @@ export default function ReceivingPage() {
     title: "",
     description: "",
   });
+  const [highlightedPoId, setHighlightedPoId] = useState<string | null>(null);
   const [deliveryDate, setDeliveryDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [receivedQty, setReceivedQty] = useState(0);
   const [condition, setCondition] = useState<"Good" | "Damaged" | "Partial">("Good");
@@ -68,6 +69,15 @@ export default function ReceivingPage() {
   const existingRecord = receivingRecords.find((record) => record.poId === effectiveSelectedPoId) ?? null;
   const canReceive = selectedOrder ? isReceivingEnabled(selectedOrder) : false;
   const isVendorView = currentRole === "Vendor";
+
+  useEffect(() => {
+    if (!highlightedPoId) {
+      return;
+    }
+
+    const timer = window.setTimeout(() => setHighlightedPoId(null), 2800);
+    return () => window.clearTimeout(timer);
+  }, [highlightedPoId]);
 
   const handleReceive = async () => {
     if (!selectedOrder) return;
@@ -89,8 +99,8 @@ export default function ReceivingPage() {
       open: true,
       title: "รับสินค้าสำเร็จ",
       description: qcRequired
-        ? "ระบบได้บันทึกรับสินค้าเรียบร้อยแล้ว และส่งรายการเข้าสู่ขั้นตอน QC"
-        : "ระบบได้บันทึกรับสินค้าเรียบร้อยแล้ว",
+        ? "ระบบได้บันทึกรับสินค้าเรียบร้อยแล้ว และส่งรายการเข้าสู่ขั้นตอน QC ระบบกำลังพากลับมาที่หน้าตรวจรับสินค้า"
+        : "ระบบได้บันทึกรับสินค้าเรียบร้อยแล้ว ระบบกำลังพากลับมาที่หน้าตรวจรับสินค้า",
     });
   };
 
@@ -101,7 +111,7 @@ export default function ReceivingPage() {
     setSuccessModal({
       open: true,
       title: "ยืนยัน QC สำเร็จ",
-      description: "ระบบได้บันทึกผลการตรวจสอบคุณภาพเรียบร้อยแล้ว",
+      description: "ระบบได้บันทึกผลการตรวจสอบคุณภาพเรียบร้อยแล้ว ระบบกำลังพากลับมาที่หน้าตรวจรับสินค้า",
     });
   };
 
@@ -139,7 +149,7 @@ export default function ReceivingPage() {
                     selectedPoId === po.id
                       ? "border-[#007946]/25 bg-[#f0f9f6]"
                       : "border-slate-200 bg-white hover:bg-slate-50"
-                  }`}
+                  } ${highlightedPoId === po.id ? "soft-highlight" : ""}`}
                 >
                   <div className="flex items-center justify-between gap-3">
                     <div>
@@ -156,7 +166,7 @@ export default function ReceivingPage() {
         </div>
 
         <div className="space-y-6">
-          <div className="rounded-[24px] border border-slate-200 bg-white p-5 shadow-sm shadow-slate-200/50 sm:p-6">
+          <div className={`rounded-[24px] border border-slate-200 bg-white p-5 shadow-sm shadow-slate-200/50 sm:p-6 ${selectedOrder?.id === highlightedPoId ? "soft-highlight" : ""}`}>
             {selectedOrder ? (
               <>
                 <div className="mb-4 flex items-start justify-between gap-4">
@@ -358,7 +368,10 @@ export default function ReceivingPage() {
         open={successModal.open}
         title={successModal.title}
         description={successModal.description}
-        onClose={() => setSuccessModal({ open: false, title: "", description: "" })}
+        onClose={() => {
+          setSuccessModal({ open: false, title: "", description: "" });
+          setHighlightedPoId(selectedOrder?.id ?? null);
+        }}
       />
     </div>
   );

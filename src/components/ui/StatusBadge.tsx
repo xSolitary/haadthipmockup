@@ -33,6 +33,8 @@ const statusStyles: Record<string, string> = {
   "กำลังเตรียมสินค้า": "border-lime-200 bg-lime-50 text-lime-800",
   "อยู่ระหว่างจัดส่ง": "border-sky-200 bg-sky-50 text-sky-700",
   "จัดส่งถึงปลายทางแล้ว": "border-[#b6dfc9] bg-[#eef8f2] text-[#0d5738]",
+  "รอรับสินค้า": "border-sky-200 bg-sky-50 text-sky-700",
+  "ผ่าน QC": "border-emerald-200 bg-emerald-50 text-emerald-700",
 };
 
 interface StatusBadgeProps {

@@ -97,6 +97,7 @@ export function VendorDeliveryActionPage({ poId }: { poId: string }) {
       <PageHeader
         title="อัปเดตสถานะการจัดส่ง"
         subtitle="ร้านค้าสามารถอัปเดตความคืบหน้าการจัดส่งให้ผู้อนุมัติและฝ่ายจัดซื้อเห็นได้ทันที"
+        badge="งานจัดส่ง"
       />
 
       <div className="grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
@@ -238,10 +239,10 @@ export function VendorDeliveryActionPage({ poId }: { poId: string }) {
       <SuccessModal
         open={successOpen}
         title="อัปเดตสถานะสำเร็จ"
-        description="ระบบได้บันทึกสถานะการจัดส่งเรียบร้อยแล้ว"
+        description="ระบบได้บันทึกสถานะการจัดส่งเรียบร้อยแล้ว ระบบกำลังพากลับไปหน้าระบบจัดซื้อ"
         onClose={() => {
           setSuccessOpen(false);
-          router.push("/my-requests?tab=po");
+          router.push(`/my-requests?tab=po&highlightId=${poId}`);
         }}
       />
     </div>

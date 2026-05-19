@@ -5,6 +5,7 @@ import type { ComponentType, ReactNode } from "react";
 import { useMemo, useState, useSyncExternalStore } from "react";
 import { ArrowRight, CalendarRange, FilePlus2, PackageSearch, Shapes, TimerReset, TrendingUp } from "lucide-react";
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
+import { PageHeader } from "@/components/ui/PageHeader";
 import { useProcurementStore } from "@/store/useProcurementStore";
 
 const chartColors = ["#007946", "#3a8f66", "#5d7ecf", "#c38f3c", "#c35d66", "#8a6ec4", "#d17b4f", "#5291a4"];
@@ -93,6 +94,31 @@ export default function DashboardPage() {
     () => true,
     () => false,
   );
+  const topbarControls = useMemo(
+    () => (
+      <div className="flex flex-wrap items-center justify-end gap-2.5">
+        <div className="inline-flex h-11 shrink-0 items-center gap-2 rounded-[18px] border border-[var(--border)] bg-[var(--surface-tint)] px-4 text-sm font-medium tracking-normal text-slate-700">
+          <CalendarRange className="h-4 w-4 text-[var(--primary)]" />
+          ช่วงวันที่
+        </div>
+        <input
+          type="date"
+          value={startDate}
+          max={endDate}
+          onChange={(event) => setStartDate(event.target.value)}
+          className="h-11 w-[9.5rem] min-w-0 rounded-[18px] border border-[var(--border)] bg-[var(--surface)] px-4 text-sm font-medium tracking-normal text-slate-700 shadow-[var(--shadow-sm)]"
+        />
+        <input
+          type="date"
+          value={endDate}
+          min={startDate}
+          onChange={(event) => setEndDate(event.target.value)}
+          className="h-11 w-[9.5rem] min-w-0 rounded-[18px] border border-[var(--border)] bg-[var(--surface)] px-4 text-sm font-medium tracking-normal text-slate-700 shadow-[var(--shadow-sm)]"
+        />
+      </div>
+    ),
+    [endDate, startDate],
+  );
 
   const filteredMemos = useMemo(
     () =>
@@ -170,38 +196,12 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-6 text-slate-900">
-      <section className={`${cardClassName} overflow-hidden px-5 py-5 sm:px-6`}>
-        <div className="flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
-          <div className="max-w-3xl">
-            <p className="inline-flex rounded-full bg-[var(--surface-tint)] px-3 py-1 text-xs font-semibold tracking-[0.12em] text-[var(--primary-ink)]">แดชบอร์ด</p>
-            <h1 className="mt-3 text-3xl font-bold tracking-normal text-slate-900 md:text-4xl">ภาพรวมการจัดซื้อ</h1>
-            <p className="mt-2 text-sm leading-6 tracking-normal text-slate-500">
-              ติดตาม KPI งานค้างและโครงสร้างการใช้จ่ายตามช่วงวันที่ที่เลือก โดยอ้างอิงข้อมูลชุดเดิมของระบบ
-            </p>
-          </div>
-
-          <div className="grid gap-3 sm:grid-cols-[auto_1fr_1fr] sm:items-center">
-            <div className="inline-flex h-11 items-center gap-2 rounded-[18px] border border-[var(--border)] bg-[var(--surface-tint)] px-4 text-sm font-medium tracking-normal text-slate-700">
-              <CalendarRange className="h-4 w-4 text-[var(--primary)]" />
-              ช่วงวันที่
-            </div>
-            <input
-              type="date"
-              value={startDate}
-              max={endDate}
-              onChange={(event) => setStartDate(event.target.value)}
-              className="h-11 rounded-[18px] border border-[var(--border)] bg-[var(--surface-strong)] px-4 text-sm font-medium tracking-normal text-slate-700 shadow-[var(--shadow-sm)]"
-            />
-            <input
-              type="date"
-              value={endDate}
-              min={startDate}
-              onChange={(event) => setEndDate(event.target.value)}
-              className="h-11 rounded-[18px] border border-[var(--border)] bg-[var(--surface-strong)] px-4 text-sm font-medium tracking-normal text-slate-700 shadow-[var(--shadow-sm)]"
-            />
-          </div>
-        </div>
-      </section>
+      <PageHeader
+        badge="แดชบอร์ด"
+        title="ภาพรวมการจัดซื้อ"
+        subtitle="ติดตาม KPI งานค้างและโครงสร้างการใช้จ่ายตามช่วงวันที่ที่เลือก โดยอ้างอิงข้อมูลชุดเดิมของระบบ"
+        topbarControls={topbarControls}
+      />
 
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-6">
         <DashboardKpiCard label="จำนวน Memo" value={memoCount.toString()} />

@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import {
   Bell,
   ChevronDown,
@@ -14,6 +15,7 @@ import {
   UserRound,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { usePageHeaderContext } from "@/components/layout/PageHeaderContext";
 import { useCurrentUserProfile } from "@/components/layout/useCurrentUserProfile";
 import { getActionNotifications, type NotificationIconKey } from "@/lib/notifications";
 import { loadFromStorage, saveToStorage } from "@/lib/storage";
@@ -44,6 +46,7 @@ function NotificationIcon({ icon }: { icon: NotificationIconKey }) {
 }
 
 export function Topbar() {
+  const pathname = usePathname();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
   const [readState, setReadState] = useState<NotificationReadState>(() => {
@@ -55,6 +58,7 @@ export function Topbar() {
   });
   const menuRef = useRef<HTMLDivElement>(null);
   const notificationRef = useRef<HTMLDivElement>(null);
+  const { pageHeader } = usePageHeaderContext();
   const { currentUser, currentUsername, initials, roleLabel, handleLogout } = useCurrentUserProfile();
   const currentRole = useProcurementStore((state) => state.currentRole);
   const currentUserId = useProcurementStore((state) => state.currentUserId);
@@ -76,6 +80,7 @@ export function Topbar() {
     (notification) => !clearedAt || new Date(notification.timestamp).getTime() > new Date(clearedAt).getTime(),
   );
   const notificationCount = notifications.length;
+  const activePageHeader = pageHeader?.pathname === pathname ? pageHeader : null;
 
   useEffect(() => {
     if (!isMenuOpen && !isNotificationOpen) {
@@ -125,11 +130,33 @@ export function Topbar() {
 
   return (
     <header className="sticky top-0 z-20 border-b border-[var(--border)] bg-[rgba(245,245,239,0.88)] px-4 py-4 backdrop-blur-xl sm:px-6 lg:px-7 xl:px-8">
-      <div className="flex w-full items-center gap-3">
-        <div className="flex-1" />
+      <div className="flex w-full flex-col gap-4 xl:flex-row xl:items-center xl:gap-5">
+        <div className="min-w-0 flex-1">
+          {activePageHeader ? (
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between lg:gap-4">
+              <div className="min-w-0">
+                <p className="inline-flex rounded-full bg-[var(--surface-tint)] px-2.5 py-1 text-[10px] font-semibold tracking-[0.16em] text-[var(--primary-ink)]">
+                  {activePageHeader.badge ?? "ระบบงาน"}
+                </p>
+                <h1 className="mt-2 truncate text-lg font-semibold text-slate-900 sm:text-xl">
+                  {activePageHeader.title}
+                </h1>
+                {activePageHeader.subtitle ? (
+                  <p className="mt-1 max-w-3xl text-xs text-slate-500 sm:text-sm">
+                    {activePageHeader.subtitle}
+                  </p>
+                ) : null}
+              </div>
+              {activePageHeader.actions ? <div className="min-w-0 lg:shrink-0">{activePageHeader.actions}</div> : null}
+            </div>
+          ) : null}
+        </div>
 
-        <div className="ml-auto flex min-w-0 flex-1 items-center justify-end gap-2.5" ref={menuRef}>
-          <div className="relative flex h-11 min-w-0 flex-1 items-center rounded-[20px] border border-[var(--border)] bg-[var(--surface)] px-4 shadow-[var(--shadow-sm)] sm:max-w-[220px] md:max-w-[240px] lg:max-w-[260px]">
+        <div
+          className="ml-auto flex w-full min-w-0 flex-wrap items-center justify-end gap-2.5 xl:w-auto xl:max-w-[56rem] xl:flex-nowrap"
+          ref={menuRef}
+        >
+          <div className="relative hidden h-11 min-w-0 flex-1 items-center rounded-[20px] border border-[var(--border)] bg-[var(--surface)] px-4 shadow-[var(--shadow-sm)] md:flex md:max-w-[220px] lg:max-w-[260px]">
             <Search className="mr-3 h-4 w-4 shrink-0 text-slate-400" />
             <input
               type="search"
@@ -207,6 +234,10 @@ export function Topbar() {
               </div>
             ) : null}
           </div>
+
+          {activePageHeader?.topbarControls ? (
+            <div className="flex shrink-0 items-center gap-2.5">{activePageHeader.topbarControls}</div>
+          ) : null}
 
           <div className="relative shrink-0">
             <button

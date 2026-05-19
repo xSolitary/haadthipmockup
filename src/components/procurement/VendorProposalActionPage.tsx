@@ -99,10 +99,12 @@ export function VendorProposalActionPage({ poId }: { poId: string }) {
     open: boolean;
     title: string;
     description: string;
+    returnTab: "pr" | "po";
   }>({
     open: false,
     title: "",
     description: "",
+    returnTab: "pr",
   });
   const [isSubmitConfirmOpen, setIsSubmitConfirmOpen] = useState(false);
   const [isAutoFilling, setIsAutoFilling] = useState(false);
@@ -205,7 +207,8 @@ export function VendorProposalActionPage({ poId }: { poId: string }) {
     setSuccessModal({
       open: true,
       title: "เลือก Vendor สำเร็จ",
-      description: "ระบบได้บันทึกรายการ Vendor ที่เลือก และส่งต่อให้หัวหน้าอนุมัติแล้ว",
+      description: "ระบบได้บันทึกรายการ Vendor ที่เลือก และส่งต่อให้หัวหน้าอนุมัติแล้ว ระบบกำลังพากลับไปหน้าระบบจัดซื้อ",
+      returnTab: "pr",
     });
   };
 
@@ -216,7 +219,8 @@ export function VendorProposalActionPage({ poId }: { poId: string }) {
     setSuccessModal({
       open: true,
       title: "ยืนยัน Vendor สำเร็จ",
-      description: "ระบบได้บันทึกการอนุมัติ Vendor แล้ว",
+      description: "ระบบได้บันทึกการอนุมัติ Vendor แล้ว ระบบกำลังพากลับไปหน้าระบบจัดซื้อ",
+      returnTab: "po",
     });
   };
 
@@ -553,8 +557,9 @@ export function VendorProposalActionPage({ poId }: { poId: string }) {
         title={successModal.title}
         description={successModal.description}
         onClose={() => {
-          setSuccessModal({ open: false, title: "", description: "" });
-          router.push("/my-requests");
+          const returnTab = successModal.returnTab;
+          setSuccessModal({ open: false, title: "", description: "", returnTab: "pr" });
+          router.push(`/my-requests?tab=${returnTab}&highlightId=${poId}`);
         }}
       />
     </div>

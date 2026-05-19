@@ -13,5 +13,7 @@ function parseTab(value: string | string[] | undefined): RequestTab {
 export default async function MyRequestsPage(props: PageProps<"/my-requests">) {
   const searchParams = await props.searchParams;
   const initialTab = parseTab(searchParams.tab);
-  return <ProcureToPayPage key={initialTab} initialTab={initialTab} />;
+  const highlightId = Array.isArray(searchParams.highlightId) ? searchParams.highlightId[0] : searchParams.highlightId;
+
+  return <ProcureToPayPage key={`${initialTab}:${highlightId ?? ""}`} initialTab={initialTab} initialHighlightId={highlightId} />;
 }

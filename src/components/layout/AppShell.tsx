@@ -2,6 +2,7 @@
 
 import { ReactNode, useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
+import { PageHeaderProvider } from "@/components/layout/PageHeaderContext";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { Topbar } from "@/components/layout/Topbar";
 import { loadFromStorage, saveToStorage } from "@/lib/storage";
@@ -84,10 +85,12 @@ export function AppShell({ children }: AppShellProps) {
           onToggleCollapse={() => setIsSidebarCollapsed((collapsed) => !collapsed)}
         />
         <div className="flex min-h-screen flex-1 flex-col">
-          <Topbar />
-          <main className="flex-1 px-4 py-5 sm:px-6 lg:px-7 xl:px-8">
-            <div className="mx-auto w-full max-w-[1520px] pb-10">{children}</div>
-          </main>
+          <PageHeaderProvider>
+            <Topbar />
+            <main className="flex-1 px-4 py-5 sm:px-6 lg:px-7 xl:px-8">
+              <div className="mx-auto w-full max-w-[1520px] pb-10">{children}</div>
+            </main>
+          </PageHeaderProvider>
         </div>
       </div>
     </div>

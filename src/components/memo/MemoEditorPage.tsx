@@ -34,12 +34,14 @@ type EditorSuccessModalState = {
   open: boolean;
   title: string;
   description: ReactNode;
+  redirectId?: string;
 };
 
 const defaultSuccessModalState: EditorSuccessModalState = {
   open: false,
   title: "",
   description: "",
+  redirectId: undefined,
 };
 
 function createBlankItem(index: number): MemoItem {
@@ -233,10 +235,11 @@ export function MemoEditorPage({ memoId }: { memoId?: string }) {
     try {
       if (isEditing && editingMemo) {
         await updateMemo(editingMemo.id, payload);
+        router.push(`/my-requests?tab=memo&highlightId=${editingMemo.id}`);
       } else {
-        await createMemo(payload);
+        const createdMemoId = await createMemo(payload);
+        router.push(`/my-requests?tab=memo&highlightId=${createdMemoId}`);
       }
-      router.push("/my-requests?tab=memo");
     } finally {
       setIsSubmitting(false);
     }
@@ -254,12 +257,18 @@ export function MemoEditorPage({ memoId }: { memoId?: string }) {
           setSuccessModal({
             open: true,
             title: "ส่ง Memo กลับไปอนุมัติสำเร็จ",
-            description: "ระบบได้ส่ง Memo ให้หัวหน้าพิจารณาอีกครั้งแล้ว",
+            description: (
+              <div className="space-y-2 text-center">
+                <p>ระบบได้ส่ง Memo ให้หัวหน้าพิจารณาอีกครั้งแล้ว</p>
+                <p>ระบบกำลังพากลับไปหน้าระบบจัดซื้อ</p>
+              </div>
+            ),
+            redirectId: editingMemo.id,
           });
         } else {
           await updateMemo(editingMemo.id, payload);
           await submitMemo(editingMemo.id);
-          router.push("/my-requests?tab=memo");
+          router.push(`/my-requests?tab=memo&highlightId=${editingMemo.id}`);
         }
       } else {
         const createdMemoId = await createMemo(payload);
@@ -267,7 +276,13 @@ export function MemoEditorPage({ memoId }: { memoId?: string }) {
         setSuccessModal({
           open: true,
           title: "สร้าง Memo สำเร็จ",
-          description: "ระบบได้สร้างและส่ง Memo เข้าสู่ขั้นตอนอนุมัติเรียบร้อยแล้ว",
+          description: (
+            <div className="space-y-2 text-center">
+              <p>ระบบได้สร้างและส่ง Memo เข้าสู่ขั้นตอนอนุมัติเรียบร้อยแล้ว</p>
+              <p>ระบบกำลังพากลับไปหน้าระบบจัดซื้อ</p>
+            </div>
+          ),
+          redirectId: createdMemoId,
         });
       }
     } finally {
@@ -615,9 +630,10 @@ export function MemoEditorPage({ memoId }: { memoId?: string }) {
         title={successModal.title}
         description={successModal.description}
         onClose={() => {
+          const redirectId = successModal.redirectId ?? memoId;
           setIsCompletingResubmit(false);
           setSuccessModal(defaultSuccessModalState);
-          router.push("/my-requests?tab=memo");
+          router.push(redirectId ? `/my-requests?tab=memo&highlightId=${redirectId}` : "/my-requests?tab=memo");
         }}
       />
     </div>

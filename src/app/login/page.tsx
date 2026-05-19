@@ -4,7 +4,6 @@ import { startTransition, useState } from "react";
 import { Eye, EyeOff, LockKeyhole, Sparkles, UserCircle2, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { mockAccounts } from "@/lib/mock-auth";
-import { getRoleLabel } from "@/lib/ui-text";
 import { useProcurementStore } from "@/store/useProcurementStore";
 
 export default function LoginPage() {
@@ -218,11 +217,9 @@ export default function LoginPage() {
                       <UserCircle2 className="h-7 w-7" />
                     </div>
                     <div>
-                      <p className="text-xl font-bold text-slate-900">{account.name}</p>
-                      <p className="mt-1 text-sm text-slate-500">
-                        {account.labelTh} • {getRoleLabel(account.role)}
+                      <p className="text-lg font-bold text-slate-900">
+                        {account.labelTh} / {account.labelEn}
                       </p>
-                      <p className="mt-1 text-sm text-slate-500">{account.subtitle}</p>
                     </div>
                   </div>
 

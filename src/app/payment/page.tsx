@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { DataTable } from "@/components/ui/DataTable";
 import { PageHeader } from "@/components/ui/PageHeader";
@@ -27,8 +27,18 @@ export default function PaymentPage() {
     title: "",
     description: "",
   });
+  const [highlightedPaymentId, setHighlightedPaymentId] = useState<string | null>(null);
 
   const selectedPayment = paymentRequests.find((payment) => payment.id === selectedPaymentId) ?? null;
+
+  useEffect(() => {
+    if (!highlightedPaymentId) {
+      return;
+    }
+
+    const timer = window.setTimeout(() => setHighlightedPaymentId(null), 2800);
+    return () => window.clearTimeout(timer);
+  }, [highlightedPaymentId]);
 
   const handleStatus = async () => {
     if (!selectedPayment) return;
@@ -38,7 +48,7 @@ export default function PaymentPage() {
       setSuccessModal({
         open: true,
         title: "ยืนยัน Invoice สำเร็จ",
-        description: "ระบบได้บันทึกใบแจ้งหนี้และอัปเดตสถานะเป็น Ready for AP Posting แล้ว",
+        description: "ระบบได้บันทึกใบแจ้งหนี้และอัปเดตสถานะเป็น Ready for AP Posting แล้ว ระบบกำลังพากลับมาที่หน้าจ่ายเงิน",
       });
       return;
     }
@@ -48,7 +58,7 @@ export default function PaymentPage() {
       setSuccessModal({
         open: true,
         title: "อนุมัติชำระเงินสำเร็จ",
-        description: "ระบบได้อัปเดตสถานะเป็น Approved for Payment เรียบร้อยแล้ว",
+        description: "ระบบได้อัปเดตสถานะเป็น Approved for Payment เรียบร้อยแล้ว ระบบกำลังพากลับมาที่หน้าจ่ายเงิน",
       });
       return;
     }
@@ -58,7 +68,7 @@ export default function PaymentPage() {
       setSuccessModal({
         open: true,
         title: "ยืนยันการจ่ายเงินสำเร็จ",
-        description: "ระบบได้อัปเดตสถานะการชำระเงินเป็น Paid เรียบร้อยแล้ว",
+        description: "ระบบได้อัปเดตสถานะการชำระเงินเป็น Paid เรียบร้อยแล้ว ระบบกำลังพากลับมาที่หน้าจ่ายเงิน",
       });
     }
   };
@@ -100,7 +110,7 @@ export default function PaymentPage() {
               {paymentRequests.map((payment) => (
                 <tr
                   key={payment.id}
-                  className="cursor-pointer border-t border-slate-100 hover:bg-slate-50"
+                  className={`cursor-pointer border-t border-slate-100 hover:bg-slate-50 ${highlightedPaymentId === payment.id ? "soft-highlight" : ""}`}
                   onClick={() => setSelectedPaymentId(payment.id)}
                 >
                   <td className="px-5 py-4">{payment.poNumber}</td>
@@ -116,7 +126,7 @@ export default function PaymentPage() {
         </div>
 
         <div className="space-y-6">
-          <div className="rounded-[24px] border border-slate-200 bg-white p-5 shadow-sm shadow-slate-200/50 sm:p-6">
+          <div className={`rounded-[24px] border border-slate-200 bg-white p-5 shadow-sm shadow-slate-200/50 sm:p-6 ${selectedPayment?.id === highlightedPaymentId ? "soft-highlight" : ""}`}>
             {selectedPayment ? (
               <>
                 <div className="mb-4 flex items-start justify-between gap-4">
@@ -187,7 +197,10 @@ export default function PaymentPage() {
         open={successModal.open}
         title={successModal.title}
         description={successModal.description}
-        onClose={() => setSuccessModal({ open: false, title: "", description: "" })}
+        onClose={() => {
+          setSuccessModal({ open: false, title: "", description: "" });
+          setHighlightedPaymentId(selectedPayment?.id ?? null);
+        }}
       />
     </div>
   );

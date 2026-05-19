@@ -110,3 +110,31 @@ select:focus-visible {
 ::-webkit-scrollbar-track {
   background: transparent;
 }
+
+@keyframes soft-highlight-pulse {
+  0%,
+  100% {
+    box-shadow:
+      0 0 0 0 rgba(16, 185, 129, 0),
+      0 10px 30px rgba(25, 46, 34, 0.06);
+    background-color: transparent;
+  }
+
+  35% {
+    box-shadow:
+      0 0 0 3px rgba(16, 185, 129, 0.16),
+      0 16px 36px rgba(16, 185, 129, 0.18);
+    background-color: rgba(236, 253, 245, 0.88);
+  }
+
+  65% {
+    box-shadow:
+      0 0 0 2px rgba(16, 185, 129, 0.1),
+      0 14px 34px rgba(16, 185, 129, 0.12);
+    background-color: rgba(240, 253, 244, 0.72);
+  }
+}
+
+.soft-highlight {
+  animation: soft-highlight-pulse 0.9s ease-in-out 1;
+}
