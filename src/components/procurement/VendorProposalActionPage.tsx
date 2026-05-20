@@ -8,6 +8,7 @@ import { FormSection } from "@/components/ui/FormSection";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { SuccessModal } from "@/components/ui/SuccessModal";
+import { PROCUREMENT_LIMITS } from "@/lib/procurement-validation";
 import { useProcurementStore } from "@/store/useProcurementStore";
 
 const formatCurrency = (value: number) =>
@@ -16,6 +17,14 @@ const formatCurrency = (value: number) =>
     currency: "THB",
     maximumFractionDigits: 0,
   }).format(value);
+
+function clampNumber(value: number, min: number, max: number) {
+  if (!Number.isFinite(value)) {
+    return min;
+  }
+
+  return Math.min(Math.max(value, min), max);
+}
 
 const emptyProposalForm = {
   vendorName: "",
@@ -293,9 +302,15 @@ export function VendorProposalActionPage({ poId }: { poId: string }) {
                 <input
                   type="number"
                   min={0}
+                  max={PROCUREMENT_LIMITS.budgetAmountMax}
                   value={proposalForm.quotedPrice}
                   onChange={(event) =>
-                    setProposalForm((current) => ({ ...current, quotedPrice: event.target.value }))
+                    setProposalForm((current) => ({
+                      ...current,
+                      quotedPrice: String(
+                        clampNumber(Number(event.target.value), 0, PROCUREMENT_LIMITS.budgetAmountMax),
+                      ),
+                    }))
                   }
                   placeholder="ราคาที่เสนอ"
                   className="h-11 rounded-xl border border-slate-200 bg-white px-4 text-sm text-slate-900"

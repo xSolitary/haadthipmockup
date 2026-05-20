@@ -14,6 +14,11 @@ import {
   type Prisma,
 } from "@prisma/client";
 import { defaultUserId, initialStoreState } from "@/lib/mock-data";
+import {
+  validateMemoPayload,
+  validateReceivingPayload,
+  validateVendorProposalPayload,
+} from "@/lib/procurement-validation";
 import type {
   ApprovalHistory,
   MemoRequest,
@@ -691,7 +696,8 @@ async function refreshBootstrapFromDbOrFallback() {
 }
 
 export async function createMemo(payload: MutableMemoPayload) {
-  const actor = await requireActor(payload.requesterId);
+  const validatedPayload = validateMemoPayload(payload) as MutableMemoPayload;
+  const actor = await requireActor(validatedPayload.requesterId);
   const approver =
     (await prisma.user.findFirst({ where: { role: PrismaRole.Approver }, orderBy: { id: "asc" } })) ??
     actor;
@@ -705,34 +711,36 @@ export async function createMemo(payload: MutableMemoPayload) {
       data: {
         id: memoId,
         documentNumber,
-        requesterId: payload.requesterId,
-        requesterName: payload.requesterName,
-        department: payload.department,
-        site: siteToDb[payload.site],
-        costCenter: payload.costCenter,
-        requestDate: payload.requestDate,
-        requiredDate: payload.requiredDate,
-        title: payload.title,
-        category: categoryToDb[payload.category],
-        purpose: payload.purpose,
-        urgency: urgencyToDb[payload.urgency],
-        budgetCode: payload.budgetCode,
-        deliveryLocation: payload.deliveryLocation,
-        attachments: payload.attachments,
-        budgetRemaining: payload.budgetRemaining,
+        requesterId: validatedPayload.requesterId,
+        requesterName: validatedPayload.requesterName,
+        department: validatedPayload.department,
+        site: siteToDb[validatedPayload.site],
+        costCenter: validatedPayload.costCenter,
+        requestDate: validatedPayload.requestDate,
+        requiredDate: validatedPayload.requiredDate,
+        title: validatedPayload.title,
+        category: categoryToDb[validatedPayload.category],
+        purpose: validatedPayload.purpose,
+        urgency: urgencyToDb[validatedPayload.urgency],
+        budgetCode: validatedPayload.budgetCode,
+        deliveryLocation: validatedPayload.deliveryLocation,
+        attachments: validatedPayload.attachments,
+        budgetRemaining: validatedPayload.budgetRemaining,
         status: PrismaMemoStatus.Draft,
         procurementStatus: PrismaProcurementStatus.NotStarted,
         assignedApproverId: approver.id,
         currentApproverName: approver.name,
-        estimatedTotal: calculateTotal(payload.items),
+        estimatedTotal: calculateTotal(validatedPayload.items),
         createdAt: now,
         updatedAt: now,
-        selectedVendorId: payload.selectedVendorId,
-        poApprovalRequired: payload.poApprovalRequired,
-        poApprovalStatus: payload.poApprovalStatus ? poApprovalStatusToDb[payload.poApprovalStatus] : undefined,
-        poAmount: payload.poAmount,
+        selectedVendorId: validatedPayload.selectedVendorId,
+        poApprovalRequired: validatedPayload.poApprovalRequired,
+        poApprovalStatus: validatedPayload.poApprovalStatus
+          ? poApprovalStatusToDb[validatedPayload.poApprovalStatus]
+          : undefined,
+        poAmount: validatedPayload.poAmount,
         items: {
-          create: payload.items.map((item) => ({
+          create: validatedPayload.items.map((item) => ({
             id: createEntityId("memo-item"),
             name: item.name,
             quantity: item.quantity,
@@ -781,40 +789,43 @@ async function updateMemoItems(tx: Prisma.TransactionClient, memoId: string, ite
 }
 
 export async function updateMemo(memoId: string, updates: Partial<MutableMemoPayload>) {
+  const validatedUpdates = validateMemoPayload(updates, { partial: true });
   await prisma.$transaction(async (tx) => {
     const memo = await tx.memo.findUnique({ where: { id: memoId } });
     if (!memo) {
       throw new Error("Memo not found");
     }
 
-    if (updates.items) {
-      await updateMemoItems(tx, memoId, updates.items);
+    if (validatedUpdates.items) {
+      await updateMemoItems(tx, memoId, validatedUpdates.items);
     }
 
     await tx.memo.update({
       where: { id: memoId },
       data: {
-        requesterId: updates.requesterId,
-        requesterName: updates.requesterName,
-        department: updates.department,
-        site: updates.site ? siteToDb[updates.site] : undefined,
-        costCenter: updates.costCenter,
-        requestDate: updates.requestDate,
-        requiredDate: updates.requiredDate,
-        title: updates.title,
-        category: updates.category ? categoryToDb[updates.category] : undefined,
-        purpose: updates.purpose,
-        urgency: updates.urgency ? urgencyToDb[updates.urgency] : undefined,
-        budgetCode: updates.budgetCode,
-        deliveryLocation: updates.deliveryLocation,
-        attachments: updates.attachments,
-        budgetRemaining: updates.budgetRemaining,
-        estimatedTotal: updates.items ? calculateTotal(updates.items) : undefined,
+        requesterId: validatedUpdates.requesterId,
+        requesterName: validatedUpdates.requesterName,
+        department: validatedUpdates.department,
+        site: validatedUpdates.site ? siteToDb[validatedUpdates.site] : undefined,
+        costCenter: validatedUpdates.costCenter,
+        requestDate: validatedUpdates.requestDate,
+        requiredDate: validatedUpdates.requiredDate,
+        title: validatedUpdates.title,
+        category: validatedUpdates.category ? categoryToDb[validatedUpdates.category] : undefined,
+        purpose: validatedUpdates.purpose,
+        urgency: validatedUpdates.urgency ? urgencyToDb[validatedUpdates.urgency] : undefined,
+        budgetCode: validatedUpdates.budgetCode,
+        deliveryLocation: validatedUpdates.deliveryLocation,
+        attachments: validatedUpdates.attachments,
+        budgetRemaining: validatedUpdates.budgetRemaining,
+        estimatedTotal: validatedUpdates.items ? calculateTotal(validatedUpdates.items) : undefined,
         updatedAt: new Date(),
-        selectedVendorId: updates.selectedVendorId,
-        poApprovalRequired: updates.poApprovalRequired,
-        poApprovalStatus: updates.poApprovalStatus ? poApprovalStatusToDb[updates.poApprovalStatus] : undefined,
-        poAmount: updates.poAmount,
+        selectedVendorId: validatedUpdates.selectedVendorId,
+        poApprovalRequired: validatedUpdates.poApprovalRequired,
+        poApprovalStatus: validatedUpdates.poApprovalStatus
+          ? poApprovalStatusToDb[validatedUpdates.poApprovalStatus]
+          : undefined,
+        poAmount: validatedUpdates.poAmount,
       },
     });
   });
@@ -861,6 +872,7 @@ export async function submitMemo(memoId: string, actorId?: string) {
 }
 
 export async function resubmitMemo(memoId: string, updates: Partial<MutableMemoPayload>, actorId?: string) {
+  const validatedUpdates = validateMemoPayload(updates, { partial: true });
   const actor = await requireActor(actorId);
   await prisma.$transaction(async (tx) => {
     const memo = await tx.memo.findUnique({ where: { id: memoId } });
@@ -868,29 +880,29 @@ export async function resubmitMemo(memoId: string, updates: Partial<MutableMemoP
       throw new Error("Memo not found");
     }
 
-    if (updates.items) {
-      await updateMemoItems(tx, memoId, updates.items);
+    if (validatedUpdates.items) {
+      await updateMemoItems(tx, memoId, validatedUpdates.items);
     }
 
     await tx.memo.update({
       where: { id: memoId },
       data: {
-        requesterId: updates.requesterId,
-        requesterName: updates.requesterName,
-        department: updates.department,
-        site: updates.site ? siteToDb[updates.site] : undefined,
-        costCenter: updates.costCenter,
-        requestDate: updates.requestDate,
-        requiredDate: updates.requiredDate,
-        title: updates.title,
-        category: updates.category ? categoryToDb[updates.category] : undefined,
-        purpose: updates.purpose,
-        urgency: updates.urgency ? urgencyToDb[updates.urgency] : undefined,
-        budgetCode: updates.budgetCode,
-        deliveryLocation: updates.deliveryLocation,
-        attachments: updates.attachments,
-        budgetRemaining: updates.budgetRemaining,
-        estimatedTotal: updates.items ? calculateTotal(updates.items) : undefined,
+        requesterId: validatedUpdates.requesterId,
+        requesterName: validatedUpdates.requesterName,
+        department: validatedUpdates.department,
+        site: validatedUpdates.site ? siteToDb[validatedUpdates.site] : undefined,
+        costCenter: validatedUpdates.costCenter,
+        requestDate: validatedUpdates.requestDate,
+        requiredDate: validatedUpdates.requiredDate,
+        title: validatedUpdates.title,
+        category: validatedUpdates.category ? categoryToDb[validatedUpdates.category] : undefined,
+        purpose: validatedUpdates.purpose,
+        urgency: validatedUpdates.urgency ? urgencyToDb[validatedUpdates.urgency] : undefined,
+        budgetCode: validatedUpdates.budgetCode,
+        deliveryLocation: validatedUpdates.deliveryLocation,
+        attachments: validatedUpdates.attachments,
+        budgetRemaining: validatedUpdates.budgetRemaining,
+        estimatedTotal: validatedUpdates.items ? calculateTotal(validatedUpdates.items) : undefined,
         status: PrismaMemoStatus.PendingApproval,
         updatedAt: new Date(),
       },
@@ -1053,6 +1065,7 @@ export type VendorProposalPayload = Omit<
 >;
 
 export async function addVendorProposal(poId: string, proposal: VendorProposalPayload, actorId?: string) {
+  const validatedProposal = validateVendorProposalPayload(proposal) as VendorProposalPayload;
   const actor = await requireActor(actorId);
   await prisma.$transaction(async (tx) => {
     const po = await tx.purchaseOrder.findUnique({ where: { id: poId } });
@@ -1064,15 +1077,15 @@ export async function addVendorProposal(poId: string, proposal: VendorProposalPa
       data: {
         id: `proposal-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
         purchaseOrderId: poId,
-        vendorId: proposal.vendorId ?? null,
-        vendorName: proposal.vendorName,
-        quotedPrice: proposal.quotedPrice,
-        leadTime: proposal.leadTime,
-        paymentTerms: proposal.paymentTerms,
-        notes: proposal.notes,
-        attachmentName: proposal.attachmentName,
-        attachmentUrl: proposal.attachmentUrl,
-        submittedToApprover: proposal.submittedToApprover ?? false,
+        vendorId: validatedProposal.vendorId ?? null,
+        vendorName: validatedProposal.vendorName,
+        quotedPrice: validatedProposal.quotedPrice,
+        leadTime: validatedProposal.leadTime,
+        paymentTerms: validatedProposal.paymentTerms,
+        notes: validatedProposal.notes,
+        attachmentName: validatedProposal.attachmentName,
+        attachmentUrl: validatedProposal.attachmentUrl,
+        submittedToApprover: validatedProposal.submittedToApprover ?? false,
         proposedById: actor.id,
         proposedByName: actor.name,
         createdAt: new Date(),
@@ -1095,7 +1108,7 @@ export async function addVendorProposal(poId: string, proposal: VendorProposalPa
       actorName: actor.name,
       role: roleFromDb[actor.role],
       action: "Vendor Proposed",
-      comment: `เพิ่ม vendor option: ${proposal.vendorName}`,
+      comment: `เพิ่ม vendor option: ${validatedProposal.vendorName}`,
     });
   });
 
@@ -1110,18 +1123,19 @@ export async function updateVendorProposal(
   proposalId: string,
   updates: Partial<VendorProposalPayload>,
 ) {
+  const validatedUpdates = validateVendorProposalPayload(updates, { partial: true });
   await prisma.vendorProposal.update({
     where: { id: proposalId, purchaseOrderId: poId },
     data: {
-      vendorId: updates.vendorId,
-      vendorName: updates.vendorName,
-      quotedPrice: updates.quotedPrice,
-      leadTime: updates.leadTime,
-      paymentTerms: updates.paymentTerms,
-      notes: updates.notes,
-      attachmentName: updates.attachmentName,
-      attachmentUrl: updates.attachmentUrl,
-      submittedToApprover: updates.submittedToApprover,
+      vendorId: validatedUpdates.vendorId,
+      vendorName: validatedUpdates.vendorName,
+      quotedPrice: validatedUpdates.quotedPrice,
+      leadTime: validatedUpdates.leadTime,
+      paymentTerms: validatedUpdates.paymentTerms,
+      notes: validatedUpdates.notes,
+      attachmentName: validatedUpdates.attachmentName,
+      attachmentUrl: validatedUpdates.attachmentUrl,
+      submittedToApprover: validatedUpdates.submittedToApprover,
     },
   });
 
@@ -1153,6 +1167,10 @@ export async function deleteVendorProposal(poId: string, proposalId: string) {
 }
 
 export async function submitVendorProposals(poId: string, proposalIds: string[], actorId?: string) {
+  if (proposalIds.length === 0) {
+    throw new Error("Select at least one vendor proposal before submitting");
+  }
+
   const actor = await requireActor(actorId);
   await prisma.$transaction(async (tx) => {
     const po = await tx.purchaseOrder.findUnique({ where: { id: poId } });
@@ -1271,6 +1289,7 @@ export async function receivePurchaseOrder(
   poId: string,
   payload: Omit<ReceivingRecord, "id" | "poId" | "poNumber" | "vendorName">,
 ) {
+  const validatedPayload = validateReceivingPayload(payload) as typeof payload;
   await prisma.$transaction(async (tx) => {
     const po = await tx.purchaseOrder.findUnique({ where: { id: poId } });
     if (!po) {
@@ -1280,7 +1299,9 @@ export async function receivePurchaseOrder(
     const recordId =
       (await tx.receivingRecord.findFirst({ where: { poId }, select: { id: true } }))?.id ??
       `recv-${Date.now()}`;
-    const nextStatus = payload.qcRequired ? PrismaProcurementStatus.Received : PrismaProcurementStatus.QCPassed;
+    const nextStatus = validatedPayload.qcRequired
+      ? PrismaProcurementStatus.Received
+      : PrismaProcurementStatus.QCPassed;
 
     await tx.receivingRecord.upsert({
       where: { id: recordId },
@@ -1289,28 +1310,28 @@ export async function receivePurchaseOrder(
         poId,
         poNumber: po.poNumber ?? po.documentNumber,
         vendorName: po.selectedVendorName ?? po.vendorName,
-        deliveryDate: payload.deliveryDate,
-        receivedQty: payload.receivedQty,
-        condition: conditionToDb[payload.condition],
-        lotNumber: payload.lotNumber,
-        batchNumber: payload.batchNumber,
-        expiryDate: payload.expiryDate,
-        coaMsds: payload.coaMsds,
-        qcRequired: payload.qcRequired,
-        qcStatus: qcStatusToDb[payload.qcStatus],
-        notes: payload.notes,
+        deliveryDate: validatedPayload.deliveryDate,
+        receivedQty: validatedPayload.receivedQty,
+        condition: conditionToDb[validatedPayload.condition],
+        lotNumber: validatedPayload.lotNumber,
+        batchNumber: validatedPayload.batchNumber,
+        expiryDate: validatedPayload.expiryDate,
+        coaMsds: validatedPayload.coaMsds,
+        qcRequired: validatedPayload.qcRequired,
+        qcStatus: qcStatusToDb[validatedPayload.qcStatus],
+        notes: validatedPayload.notes,
       },
       update: {
-        deliveryDate: payload.deliveryDate,
-        receivedQty: payload.receivedQty,
-        condition: conditionToDb[payload.condition],
-        lotNumber: payload.lotNumber,
-        batchNumber: payload.batchNumber,
-        expiryDate: payload.expiryDate,
-        coaMsds: payload.coaMsds,
-        qcRequired: payload.qcRequired,
-        qcStatus: qcStatusToDb[payload.qcStatus],
-        notes: payload.notes,
+        deliveryDate: validatedPayload.deliveryDate,
+        receivedQty: validatedPayload.receivedQty,
+        condition: conditionToDb[validatedPayload.condition],
+        lotNumber: validatedPayload.lotNumber,
+        batchNumber: validatedPayload.batchNumber,
+        expiryDate: validatedPayload.expiryDate,
+        coaMsds: validatedPayload.coaMsds,
+        qcRequired: validatedPayload.qcRequired,
+        qcStatus: qcStatusToDb[validatedPayload.qcStatus],
+        notes: validatedPayload.notes,
       },
     });
 

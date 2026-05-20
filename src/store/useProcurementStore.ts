@@ -4,11 +4,18 @@ import type { StateStorage } from "zustand/middleware";
 import { apiFetch } from "@/lib/api";
 import { findMockAccount } from "@/lib/mock-auth";
 import { defaultRole, defaultUserId, initialStoreState } from "@/lib/mock-data";
+import {
+  validateMemoPayload,
+  validateVendorProposalPayload,
+} from "@/lib/procurement-validation";
 import type {
+  ApprovalHistory,
+  MemoRequest,
   PaymentRequest,
   ProcurementState,
   ReceivingRecord,
   Role,
+  User,
   VendorDeliveryUpdate,
   VendorProposal,
 } from "@/lib/types";
@@ -29,6 +36,7 @@ function getBaseState() {
     ...initialStoreState,
     vendorDeliveries: {},
     isSyncing: false,
+    dataMode: "remote",
   } as unknown as Omit<
     ProcurementState,
     | "initializeData"
@@ -78,6 +86,7 @@ function mergeVendorUser(users: ProcurementState["users"]) {
 
 function patchBootstrapData(set: (partial: Partial<ProcurementState>) => void, data: BootstrapData) {
   set({
+    dataMode: "remote",
     users: mergeVendorUser(data.users),
     memos: data.memos,
     vendors: data.vendors,
@@ -87,6 +96,69 @@ function patchBootstrapData(set: (partial: Partial<ProcurementState>) => void, d
     receivingRecords: data.receivingRecords,
     paymentRequests: data.paymentRequests,
   });
+}
+
+function isMissingDatabaseError(error: unknown) {
+  return error instanceof Error && error.message.includes("Database is not configured");
+}
+
+function toIsoNow() {
+  return new Date().toISOString();
+}
+
+function formatDocumentNumber(prefix: "MEMO" | "PR" | "PO", nextNumber: number) {
+  return `${prefix}-2026-${String(nextNumber).padStart(6, "0")}`;
+}
+
+function createLocalId(prefix: string) {
+  return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function buildActionLabel(action: ApprovalHistory["action"]) {
+  return action;
+}
+
+function buildHistoryEntry(params: {
+  documentId: string;
+  documentNumber: string;
+  documentType: ApprovalHistory["documentType"];
+  actor: User;
+  action: ApprovalHistory["action"];
+  comment: string;
+}): ApprovalHistory {
+  return {
+    id: createLocalId("hist"),
+    documentId: params.documentId,
+    documentNumber: params.documentNumber,
+    documentType: params.documentType,
+    actorId: params.actor.id,
+    actorName: params.actor.name,
+    role: params.actor.role,
+    action: params.action,
+    comment: params.comment,
+    date: toIsoNow(),
+    actionLabelTh: buildActionLabel(params.action),
+  };
+}
+
+function sumItems(items: Array<{ quantity: number; unitPrice: number }>) {
+  return items.reduce((sum, item) => sum + item.quantity * item.unitPrice, 0);
+}
+
+function getActor(state: ProcurementState, actorId?: string) {
+  return (
+    state.users.find((user) => user.id === actorId) ??
+    state.users.find((user) => user.id === state.currentUserId) ??
+    state.users[0]
+  );
+}
+
+function updateMemoInState(
+  memos: MemoRequest[],
+  memoId: string,
+  updater: (memo: MemoRequest) => MemoRequest,
+) {
+  return memos.map((memo) => (memo.id === memoId ? updater(memo) : memo));
 }
 
 async function refreshBootstrap(set: (partial: Partial<ProcurementState>) => void) {
@@ -100,6 +172,10 @@ export const useProcurementStore = create<ProcurementState>()(
       ...getBaseState(),
       initializeData: async () => {
         if (typeof window === "undefined") {
+          return;
+        }
+
+        if (get().dataMode === "local") {
           return;
         }
 
@@ -162,116 +238,583 @@ export const useProcurementStore = create<ProcurementState>()(
         });
       },
       createMemo: async (memo) => {
-        const response = await apiFetch<{ memoId: string; data: BootstrapData }>("/api/memos", {
-          method: "POST",
-          body: JSON.stringify(memo),
-        });
-        patchBootstrapData(set, response.data);
-        return response.memoId;
+        try {
+          const response = await apiFetch<{ memoId: string; data: BootstrapData }>("/api/memos", {
+            method: "POST",
+            body: JSON.stringify(memo),
+          });
+          patchBootstrapData(set, response.data);
+          return response.memoId;
+        } catch (error) {
+          if (!isMissingDatabaseError(error)) {
+            throw error;
+          }
+
+          const validatedMemo = validateMemoPayload(memo) as typeof memo;
+          const state = get();
+          const actor = getActor(state, validatedMemo.requesterId);
+          const approver = state.users.find((user) => user.role === "Approver") ?? actor;
+          const memoId = createLocalId("memo");
+          const documentNumber = formatDocumentNumber("MEMO", state.memos.length + 1);
+          const now = toIsoNow();
+          const createdMemo: MemoRequest = {
+            ...validatedMemo,
+            id: memoId,
+            documentNumber,
+            assignedApproverId: approver.id,
+            currentApproverName: approver.name,
+            estimatedTotal: sumItems(validatedMemo.items),
+            status: "Draft" as const,
+            procurementStatus: "Not Started" as const,
+            createdAt: now,
+            updatedAt: now,
+            history: [
+              buildHistoryEntry({
+                documentId: memoId,
+                documentNumber,
+                documentType: "Memo",
+                actor,
+                action: "Draft Saved",
+                comment: "Created memo draft in local demo mode",
+              }),
+            ],
+          };
+
+          set({
+            dataMode: "local",
+            memos: [...state.memos, createdMemo],
+            approvalHistory: [...state.approvalHistory, ...createdMemo.history],
+          });
+
+          return memoId;
+        }
       },
       saveDraft: async (memoId, updates) => {
         await get().updateMemo(memoId, updates);
       },
       updateMemo: async (memoId, updates) => {
-        const response = await apiFetch<{ data: BootstrapData }>(`/api/memos/${memoId}`, {
-          method: "PATCH",
-          body: JSON.stringify(updates),
-        });
-        patchBootstrapData(set, response.data);
+        try {
+          const response = await apiFetch<{ data: BootstrapData }>(`/api/memos/${memoId}`, {
+            method: "PATCH",
+            body: JSON.stringify(updates),
+          });
+          patchBootstrapData(set, response.data);
+        } catch (error) {
+          if (!isMissingDatabaseError(error)) {
+            throw error;
+          }
+
+          const validatedUpdates = validateMemoPayload(updates, { partial: true });
+          const state = get();
+          set({
+            dataMode: "local",
+            memos: updateMemoInState(state.memos, memoId, (memo) => ({
+              ...memo,
+              ...validatedUpdates,
+              estimatedTotal: validatedUpdates.items ? sumItems(validatedUpdates.items) : memo.estimatedTotal,
+              updatedAt: toIsoNow(),
+            })),
+          });
+        }
       },
       submitMemo: async (memoId) => {
-        const response = await apiFetch<{ data: BootstrapData }>(`/api/memos/${memoId}/submit`, {
-          method: "POST",
-          body: JSON.stringify({ actorId: get().currentUserId }),
-        });
-        patchBootstrapData(set, response.data);
+        try {
+          const response = await apiFetch<{ data: BootstrapData }>(`/api/memos/${memoId}/submit`, {
+            method: "POST",
+            body: JSON.stringify({ actorId: get().currentUserId }),
+          });
+          patchBootstrapData(set, response.data);
+        } catch (error) {
+          if (!isMissingDatabaseError(error)) {
+            throw error;
+          }
+
+          const state = get();
+          const actor = getActor(state);
+          let createdHistory: ApprovalHistory | null = null;
+          const nextMemos = updateMemoInState(state.memos, memoId, (memo) => {
+            createdHistory = buildHistoryEntry({
+              documentId: memo.id,
+              documentNumber: memo.documentNumber,
+              documentType: "Memo",
+              actor,
+              action: "Submitted",
+              comment: "Submitted memo in local demo mode",
+            });
+            return {
+              ...memo,
+              status: "Pending Approval" as const,
+              updatedAt: toIsoNow(),
+              history: [...memo.history, createdHistory],
+            };
+          });
+
+          set({
+            dataMode: "local",
+            memos: nextMemos,
+            approvalHistory: createdHistory
+              ? [...state.approvalHistory, createdHistory]
+              : state.approvalHistory,
+          });
+        }
       },
       resubmitMemo: async (memoId, updates) => {
-        const response = await apiFetch<{ data: BootstrapData }>(`/api/memos/${memoId}/resubmit`, {
-          method: "POST",
-          body: JSON.stringify({
-            actorId: get().currentUserId,
-            updates,
-          }),
-        });
-        patchBootstrapData(set, response.data);
+        try {
+          const response = await apiFetch<{ data: BootstrapData }>(`/api/memos/${memoId}/resubmit`, {
+            method: "POST",
+            body: JSON.stringify({
+              actorId: get().currentUserId,
+              updates,
+            }),
+          });
+          patchBootstrapData(set, response.data);
+        } catch (error) {
+          if (!isMissingDatabaseError(error)) {
+            throw error;
+          }
+
+          const validatedUpdates = validateMemoPayload(updates, { partial: true });
+          const state = get();
+          const actor = getActor(state);
+          let createdHistory: ApprovalHistory | null = null;
+          const nextMemos = updateMemoInState(state.memos, memoId, (memo) => {
+            createdHistory = buildHistoryEntry({
+              documentId: memo.id,
+              documentNumber: memo.documentNumber,
+              documentType: "Memo",
+              actor,
+              action: "Resubmitted",
+              comment: "Resubmitted memo in local demo mode",
+            });
+            return {
+              ...memo,
+              ...validatedUpdates,
+              estimatedTotal: validatedUpdates.items ? sumItems(validatedUpdates.items) : memo.estimatedTotal,
+              status: "Pending Approval" as const,
+              updatedAt: toIsoNow(),
+              history: [...memo.history, createdHistory],
+            };
+          });
+
+          set({
+            dataMode: "local",
+            memos: nextMemos,
+            approvalHistory: createdHistory
+              ? [...state.approvalHistory, createdHistory]
+              : state.approvalHistory,
+          });
+        }
       },
       approveMemo: async (memoId, comment) => {
-        const response = await apiFetch<{ data: BootstrapData }>(`/api/memos/${memoId}/approve`, {
-          method: "POST",
-          body: JSON.stringify({ actorId: get().currentUserId, comment }),
-        });
-        patchBootstrapData(set, response.data);
-      },
-      rejectMemo: async (memoId, comment) => {
-        const response = await apiFetch<{ data: BootstrapData }>(`/api/memos/${memoId}/reject`, {
-          method: "POST",
-          body: JSON.stringify({ actorId: get().currentUserId, comment }),
-        });
-        patchBootstrapData(set, response.data);
-      },
-      requestRevision: async (memoId, comment) => {
-        const response = await apiFetch<{ data: BootstrapData }>(
-          `/api/memos/${memoId}/request-revision`,
-          {
+        try {
+          const response = await apiFetch<{ data: BootstrapData }>(`/api/memos/${memoId}/approve`, {
             method: "POST",
             body: JSON.stringify({ actorId: get().currentUserId, comment }),
-          },
-        );
-        patchBootstrapData(set, response.data);
+          });
+          patchBootstrapData(set, response.data);
+        } catch (error) {
+          if (!isMissingDatabaseError(error)) {
+            throw error;
+          }
+
+          const state = get();
+          const actor = getActor(state);
+          const poSequence = state.purchaseOrders.length + 1;
+          const prNumber = formatDocumentNumber("PR", poSequence);
+          const poNumber = formatDocumentNumber("PO", poSequence);
+          const poId = `po-${poSequence}`;
+          const now = toIsoNow();
+          let createdHistory: ApprovalHistory | null = null;
+          let createdPo: ProcurementState["purchaseOrders"][number] | null = null;
+
+          const nextMemos = updateMemoInState(state.memos, memoId, (memo) => {
+            createdHistory = buildHistoryEntry({
+              documentId: memo.id,
+              documentNumber: memo.documentNumber,
+              documentType: "Memo",
+              actor,
+              action: "Approved",
+              comment: comment || "Approved in local demo mode",
+            });
+            createdPo = {
+              id: poId,
+              documentNumber: prNumber,
+              memoId: memo.id,
+              memoTitle: memo.title,
+              vendorId: null,
+              vendorName: "Awaiting vendor proposal",
+              procurementStatus: "Waiting for Purchasing to Propose Vendors" as const,
+              amount: memo.estimatedTotal,
+              createdAt: now,
+              updatedAt: now,
+              prNumber,
+              poNumber,
+              poApprovalRequired: false,
+              vendorProposals: [],
+              history: [],
+            };
+            return {
+              ...memo,
+              status: "Approved" as const,
+              procurementStatus: "Waiting for Purchasing to Propose Vendors" as const,
+              prNumber,
+              poNumber,
+              updatedAt: now,
+              history: [...memo.history, createdHistory],
+            };
+          });
+
+          set({
+            dataMode: "local",
+            memos: nextMemos,
+            purchaseOrders: createdPo ? [...state.purchaseOrders, createdPo] : state.purchaseOrders,
+            approvalHistory: createdHistory
+              ? [...state.approvalHistory, createdHistory]
+              : state.approvalHistory,
+          });
+        }
+      },
+      rejectMemo: async (memoId, comment) => {
+        try {
+          const response = await apiFetch<{ data: BootstrapData }>(`/api/memos/${memoId}/reject`, {
+            method: "POST",
+            body: JSON.stringify({ actorId: get().currentUserId, comment }),
+          });
+          patchBootstrapData(set, response.data);
+        } catch (error) {
+          if (!isMissingDatabaseError(error)) {
+            throw error;
+          }
+
+          const state = get();
+          const actor = getActor(state);
+          let createdHistory: ApprovalHistory | null = null;
+          const nextMemos = updateMemoInState(state.memos, memoId, (memo) => {
+            createdHistory = buildHistoryEntry({
+              documentId: memo.id,
+              documentNumber: memo.documentNumber,
+              documentType: "Memo",
+              actor,
+              action: "Rejected",
+              comment: comment || "Rejected in local demo mode",
+            });
+            return {
+              ...memo,
+              status: "Rejected" as const,
+              updatedAt: toIsoNow(),
+              history: [...memo.history, createdHistory],
+            };
+          });
+
+          set({
+            dataMode: "local",
+            memos: nextMemos,
+            approvalHistory: createdHistory
+              ? [...state.approvalHistory, createdHistory]
+              : state.approvalHistory,
+          });
+        }
+      },
+      requestRevision: async (memoId, comment) => {
+        try {
+          const response = await apiFetch<{ data: BootstrapData }>(
+            `/api/memos/${memoId}/request-revision`,
+            {
+              method: "POST",
+              body: JSON.stringify({ actorId: get().currentUserId, comment }),
+            },
+          );
+          patchBootstrapData(set, response.data);
+        } catch (error) {
+          if (!isMissingDatabaseError(error)) {
+            throw error;
+          }
+
+          const state = get();
+          const actor = getActor(state);
+          let createdHistory: ApprovalHistory | null = null;
+          const nextMemos = updateMemoInState(state.memos, memoId, (memo) => {
+            createdHistory = buildHistoryEntry({
+              documentId: memo.id,
+              documentNumber: memo.documentNumber,
+              documentType: "Memo",
+              actor,
+              action: "Revision Required",
+              comment: comment || "Revision requested in local demo mode",
+            });
+            return {
+              ...memo,
+              status: "Revision Required" as const,
+              updatedAt: toIsoNow(),
+              history: [...memo.history, createdHistory],
+            };
+          });
+
+          set({
+            dataMode: "local",
+            memos: nextMemos,
+            approvalHistory: createdHistory
+              ? [...state.approvalHistory, createdHistory]
+              : state.approvalHistory,
+          });
+        }
       },
       createPR: async () => undefined,
       addVendorProposal: async (
         poId,
         proposal: Omit<VendorProposal, "id" | "proposedById" | "proposedByName" | "createdAt">,
       ) => {
-        const response = await apiFetch<{ data: BootstrapData }>(
-          `/api/purchase-orders/${poId}/vendor-proposals`,
-          {
-            method: "POST",
-            body: JSON.stringify({ actorId: get().currentUserId, proposal }),
-          },
-        );
-        patchBootstrapData(set, response.data);
+        try {
+          const response = await apiFetch<{ data: BootstrapData }>(
+            `/api/purchase-orders/${poId}/vendor-proposals`,
+            {
+              method: "POST",
+              body: JSON.stringify({ actorId: get().currentUserId, proposal }),
+            },
+          );
+          patchBootstrapData(set, response.data);
+        } catch (error) {
+          if (!isMissingDatabaseError(error)) {
+            throw error;
+          }
+
+          const validatedProposal = validateVendorProposalPayload(proposal) as typeof proposal;
+          const state = get();
+          const actor = getActor(state);
+          let createdHistory: ApprovalHistory | null = null;
+          const nextPurchaseOrders = state.purchaseOrders.map((po) => {
+            if (po.id !== poId) {
+              return po;
+            }
+
+            const nextProposal: VendorProposal = {
+              ...validatedProposal,
+              id: createLocalId("proposal"),
+              proposedById: actor.id,
+              proposedByName: actor.name,
+              createdAt: toIsoNow(),
+            };
+            createdHistory = buildHistoryEntry({
+              documentId: po.id,
+              documentNumber: po.prNumber ?? po.documentNumber,
+              documentType: "PR",
+              actor,
+              action: "Vendor Proposed",
+              comment: `Added vendor option ${validatedProposal.vendorName} in local demo mode`,
+            });
+            return {
+              ...po,
+              updatedAt: toIsoNow(),
+              vendorProposals: [...po.vendorProposals, nextProposal],
+              history: createdHistory ? [...po.history, createdHistory] : po.history,
+            };
+          });
+
+          set({
+            dataMode: "local",
+            purchaseOrders: nextPurchaseOrders,
+            approvalHistory: createdHistory
+              ? [...state.approvalHistory, createdHistory]
+              : state.approvalHistory,
+          });
+        }
       },
       updateVendorProposal: async (poId, proposalId, updates) => {
-        const response = await apiFetch<{ data: BootstrapData }>(
-          `/api/purchase-orders/${poId}/vendor-proposals/${proposalId}`,
-          {
-            method: "PATCH",
-            body: JSON.stringify(updates),
-          },
-        );
-        patchBootstrapData(set, response.data);
+        try {
+          const response = await apiFetch<{ data: BootstrapData }>(
+            `/api/purchase-orders/${poId}/vendor-proposals/${proposalId}`,
+            {
+              method: "PATCH",
+              body: JSON.stringify(updates),
+            },
+          );
+          patchBootstrapData(set, response.data);
+        } catch (error) {
+          if (!isMissingDatabaseError(error)) {
+            throw error;
+          }
+
+          const validatedUpdates = validateVendorProposalPayload(updates, { partial: true });
+          const state = get();
+          set({
+            dataMode: "local",
+            purchaseOrders: state.purchaseOrders.map((po) =>
+              po.id !== poId
+                ? po
+                : {
+                    ...po,
+                    updatedAt: toIsoNow(),
+                    vendorProposals: po.vendorProposals.map((proposal) =>
+                      proposal.id === proposalId ? { ...proposal, ...validatedUpdates } : proposal,
+                    ),
+                  },
+            ),
+          });
+        }
       },
       deleteVendorProposal: async (poId, proposalId) => {
-        const response = await apiFetch<{ data: BootstrapData }>(
-          `/api/purchase-orders/${poId}/vendor-proposals/${proposalId}`,
-          {
-            method: "DELETE",
-          },
-        );
-        patchBootstrapData(set, response.data);
+        try {
+          const response = await apiFetch<{ data: BootstrapData }>(
+            `/api/purchase-orders/${poId}/vendor-proposals/${proposalId}`,
+            {
+              method: "DELETE",
+            },
+          );
+          patchBootstrapData(set, response.data);
+        } catch (error) {
+          if (!isMissingDatabaseError(error)) {
+            throw error;
+          }
+
+          const state = get();
+          set({
+            dataMode: "local",
+            purchaseOrders: state.purchaseOrders.map((po) =>
+              po.id !== poId
+                ? po
+                : {
+                    ...po,
+                    updatedAt: toIsoNow(),
+                    vendorProposals: po.vendorProposals.filter((proposal) => proposal.id !== proposalId),
+                  },
+            ),
+          });
+        }
       },
       submitVendorProposals: async (poId, proposalIds) => {
-        const response = await apiFetch<{ data: BootstrapData }>(
-          `/api/purchase-orders/${poId}/submit-vendor-proposals`,
-          {
-            method: "POST",
-            body: JSON.stringify({ actorId: get().currentUserId, proposalIds }),
-          },
-        );
-        patchBootstrapData(set, response.data);
+        if (proposalIds.length === 0) {
+          throw new Error("Select at least one vendor proposal before submitting");
+        }
+
+        try {
+          const response = await apiFetch<{ data: BootstrapData }>(
+            `/api/purchase-orders/${poId}/submit-vendor-proposals`,
+            {
+              method: "POST",
+              body: JSON.stringify({ actorId: get().currentUserId, proposalIds }),
+            },
+          );
+          patchBootstrapData(set, response.data);
+        } catch (error) {
+          if (!isMissingDatabaseError(error)) {
+            throw error;
+          }
+
+          const state = get();
+          const actor = getActor(state);
+          let createdHistory: ApprovalHistory | null = null;
+          const nextPurchaseOrders = state.purchaseOrders.map((po) => {
+            if (po.id !== poId) {
+              return po;
+            }
+
+            createdHistory = buildHistoryEntry({
+              documentId: po.id,
+              documentNumber: po.prNumber ?? po.documentNumber,
+              documentType: "PR",
+              actor,
+              action: "Submitted for Vendor Approval",
+              comment: `Submitted ${proposalIds.length} vendor options in local demo mode`,
+            });
+            return {
+              ...po,
+              procurementStatus: "Pending Vendor Approval" as const,
+              updatedAt: toIsoNow(),
+              vendorProposals: po.vendorProposals.map((proposal) => ({
+                ...proposal,
+                submittedToApprover: proposalIds.includes(proposal.id),
+              })),
+              history: createdHistory ? [...po.history, createdHistory] : po.history,
+            };
+          });
+
+          const poMemoId = state.purchaseOrders.find((po) => po.id === poId)?.memoId;
+          const nextMemos = poMemoId
+            ? updateMemoInState(state.memos, poMemoId, (memo) => ({
+                ...memo,
+                procurementStatus: "Pending Vendor Approval" as const,
+                updatedAt: toIsoNow(),
+              }))
+            : state.memos;
+
+          set({
+            dataMode: "local",
+            purchaseOrders: nextPurchaseOrders,
+            memos: nextMemos,
+            approvalHistory: createdHistory
+              ? [...state.approvalHistory, createdHistory]
+              : state.approvalHistory,
+          });
+        }
       },
       approveVendorSelection: async (poId, proposalId, comment) => {
-        const response = await apiFetch<{ data: BootstrapData }>(
-          `/api/purchase-orders/${poId}/approve-vendor-selection`,
-          {
-            method: "POST",
-            body: JSON.stringify({ actorId: get().currentUserId, proposalId, comment }),
-          },
-        );
-        patchBootstrapData(set, response.data);
+        try {
+          const response = await apiFetch<{ data: BootstrapData }>(
+            `/api/purchase-orders/${poId}/approve-vendor-selection`,
+            {
+              method: "POST",
+              body: JSON.stringify({ actorId: get().currentUserId, proposalId, comment }),
+            },
+          );
+          patchBootstrapData(set, response.data);
+        } catch (error) {
+          if (!isMissingDatabaseError(error)) {
+            throw error;
+          }
+
+          const state = get();
+          const actor = getActor(state);
+          const selectedPo = state.purchaseOrders.find((po) => po.id === poId);
+          const selectedProposal = selectedPo?.vendorProposals.find((proposal) => proposal.id === proposalId);
+          if (!selectedPo || !selectedProposal) {
+            throw error;
+          }
+
+          let createdHistory: ApprovalHistory | null = null;
+          const nextPurchaseOrders = state.purchaseOrders.map((po) => {
+            if (po.id !== poId) {
+              return po;
+            }
+
+            createdHistory = buildHistoryEntry({
+              documentId: po.id,
+              documentNumber: po.prNumber ?? po.documentNumber,
+              documentType: "PR",
+              actor,
+              action: "Vendor Confirmed",
+              comment: comment || `Confirmed ${selectedProposal.vendorName} in local demo mode`,
+            });
+            return {
+              ...po,
+              vendorId: selectedProposal.vendorId ?? null,
+              vendorName: selectedProposal.vendorName,
+              selectedVendorId: selectedProposal.vendorId ?? selectedProposal.id,
+              selectedVendorName: selectedProposal.vendorName,
+              amount: selectedProposal.quotedPrice,
+              procurementStatus: "PO Created" as const,
+              poApprovalRequired: false,
+              poApprovalStatus: undefined,
+              updatedAt: toIsoNow(),
+              history: createdHistory ? [...po.history, createdHistory] : po.history,
+            };
+          });
+
+          const nextMemos = updateMemoInState(state.memos, selectedPo.memoId, (memo) => ({
+            ...memo,
+            procurementStatus: "PO Created" as const,
+            selectedVendorId: selectedProposal.vendorId ?? selectedProposal.id,
+            updatedAt: toIsoNow(),
+          }));
+
+          set({
+            dataMode: "local",
+            purchaseOrders: nextPurchaseOrders,
+            memos: nextMemos,
+            approvalHistory: createdHistory
+              ? [...state.approvalHistory, createdHistory]
+              : state.approvalHistory,
+          });
+        }
       },
       selectVendor: async (poId, vendorId) => {
         const vendor = get().vendors.find((item) => item.id === vendorId);
@@ -360,11 +903,31 @@ export const useProcurementStore = create<ProcurementState>()(
         typeof window === "undefined" ? noopStorage : window.localStorage,
       ),
       partialize: (state) => ({
-        currentRole: state.currentRole,
-        currentUserId: state.currentUserId,
-        currentUsername: state.currentUsername,
-        isAuthenticated: state.isAuthenticated,
-        vendorDeliveries: state.vendorDeliveries,
+        ...(state.dataMode === "local"
+          ? {
+              dataMode: state.dataMode,
+              currentRole: state.currentRole,
+              currentUserId: state.currentUserId,
+              currentUsername: state.currentUsername,
+              isAuthenticated: state.isAuthenticated,
+              vendorDeliveries: state.vendorDeliveries,
+              users: state.users,
+              memos: state.memos,
+              vendors: state.vendors,
+              purchaseOrders: state.purchaseOrders,
+              poApprovalRequests: state.poApprovalRequests,
+              approvalHistory: state.approvalHistory,
+              receivingRecords: state.receivingRecords,
+              paymentRequests: state.paymentRequests,
+            }
+          : {
+              dataMode: state.dataMode,
+              currentRole: state.currentRole,
+              currentUserId: state.currentUserId,
+              currentUsername: state.currentUsername,
+              isAuthenticated: state.isAuthenticated,
+              vendorDeliveries: state.vendorDeliveries,
+            }),
       }),
       merge: (persistedState, currentState) => ({
         ...currentState,

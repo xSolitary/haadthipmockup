@@ -1,36 +1,60 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Haadthip Procurement Mockup
 
-## Getting Started
+Next.js 16 procurement workflow mockup backed by Prisma and PostgreSQL.
 
-First, run the development server:
+## Local development
+
+1. Copy `.env.example` to `.env` and fill in your local database values.
+2. Start PostgreSQL.
+3. Apply the schema with `npm run prisma:migrate:dev` or `npm run prisma:push`.
+4. Optional: seed demo data with `npm run prisma:seed`.
+5. Start the app with `npm run dev`.
+
+## Environment variables
+
+- `DATABASE_URL`: PostgreSQL connection string used by Prisma on the server.
+- `NEXT_PUBLIC_APP_URL`: Public base URL used by the client.
+- `SEED_ON_START`: Only used by `scripts/start-container.sh` for Docker-based startup.
+
+Having both `.env` and `.env.example` is normal:
+
+- `.env` is your real local configuration and should stay private.
+- `.env.example` is a safe template for teammates and deployment setup.
+
+## Prisma scripts
+
+- `npm run prisma:generate`: Regenerate the Prisma client.
+- `npm run prisma:migrate:dev`: Create or apply local development migrations.
+- `npm run prisma:migrate:deploy`: Apply committed migrations to a deployed database.
+- `npm run prisma:push`: Push the current schema without creating a migration.
+- `npm run prisma:seed`: Seed demo data into a configured database.
+
+## Deploying to Vercel
+
+Vercel will build the Next.js app, but it will not run `scripts/start-container.sh`. That means Prisma schema setup and seeding need to happen through Prisma commands instead of container startup.
+
+### Before the first deploy
+
+1. Create a hosted PostgreSQL database.
+2. Add `DATABASE_URL` and `NEXT_PUBLIC_APP_URL` in the Vercel project settings.
+3. Keep `SEED_ON_START=false` for Vercel. It is not used there.
+4. Apply the committed Prisma migration to the hosted database:
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm run prisma:migrate:deploy
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+5. If you want the demo records in that hosted database, run:
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+npm run prisma:seed
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+### Recommended Vercel settings
 
-## Learn More
+- Framework preset: `Next.js`
+- Install command: `npm install`
+- Build command: `npm run build`
+- Output setting: leave default for Next.js
 
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+The `postinstall` script runs `prisma generate`, which helps ensure the Prisma client exists during Vercel builds.

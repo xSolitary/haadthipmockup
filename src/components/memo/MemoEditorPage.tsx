@@ -10,6 +10,7 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { SuccessModal } from "@/components/ui/SuccessModal";
 import { departments, sites } from "@/lib/mock-data";
+import { PROCUREMENT_LIMITS } from "@/lib/procurement-validation";
 import type { MemoItem, MemoRequest, ProcurementCategory } from "@/lib/types";
 import { getCategoryLabel, getUrgencyLabel } from "@/lib/ui-text";
 import { useProcurementStore } from "@/store/useProcurementStore";
@@ -43,6 +44,14 @@ const defaultSuccessModalState: EditorSuccessModalState = {
   description: "",
   redirectId: undefined,
 };
+
+function clampNumber(value: number, min: number, max: number) {
+  if (!Number.isFinite(value)) {
+    return min;
+  }
+
+  return Math.min(Math.max(value, min), max);
+}
 
 function createBlankItem(index: number): MemoItem {
   return {
@@ -181,7 +190,12 @@ export function MemoEditorPage({ memoId }: { memoId?: string }) {
         item.id === id
           ? {
               ...item,
-              [field]: field === "quantity" || field === "unitPrice" ? Number(value) : value,
+              [field]:
+                field === "quantity"
+                  ? clampNumber(Number(value), 1, PROCUREMENT_LIMITS.itemQuantityMax)
+                  : field === "unitPrice"
+                    ? clampNumber(Number(value), 0, PROCUREMENT_LIMITS.unitPriceMax)
+                    : value,
             }
           : item,
       ),
@@ -476,6 +490,7 @@ export function MemoEditorPage({ memoId }: { memoId?: string }) {
                       <input
                         type="number"
                         min={1}
+                        max={PROCUREMENT_LIMITS.itemQuantityMax}
                         value={item.quantity}
                         onChange={(event) => handleItemChange(item.id, "quantity", Number(event.target.value))}
                         className="h-11 w-full rounded-xl border border-slate-200 bg-white px-4 text-sm text-slate-900"
@@ -486,6 +501,7 @@ export function MemoEditorPage({ memoId }: { memoId?: string }) {
                       <input
                         type="number"
                         min={0}
+                        max={PROCUREMENT_LIMITS.unitPriceMax}
                         value={item.unitPrice}
                         onChange={(event) => handleItemChange(item.id, "unitPrice", Number(event.target.value))}
                         className="h-11 w-full rounded-xl border border-slate-200 bg-white px-4 text-sm text-slate-900"

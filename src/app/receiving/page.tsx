@@ -5,6 +5,7 @@ import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { SuccessModal } from "@/components/ui/SuccessModal";
+import { PROCUREMENT_LIMITS } from "@/lib/procurement-validation";
 import { useProcurementStore } from "@/store/useProcurementStore";
 import {
   formatVendorUpdateTimestamp,
@@ -19,6 +20,14 @@ const formatCurrency = (value: number) =>
     currency: "THB",
     maximumFractionDigits: 0,
   }).format(value);
+
+function clampNumber(value: number, min: number, max: number) {
+  if (!Number.isFinite(value)) {
+    return min;
+  }
+
+  return Math.min(Math.max(value, min), max);
+}
 
 export default function ReceivingPage() {
   const currentRole = useProcurementStore((state) => state.currentRole);
@@ -248,8 +257,13 @@ export default function ReceivingPage() {
                       <input
                         type="number"
                         min={0}
+                        max={PROCUREMENT_LIMITS.itemQuantityMax}
                         value={receivedQty}
-                        onChange={(event) => setReceivedQty(Number(event.target.value))}
+                        onChange={(event) =>
+                          setReceivedQty(
+                            clampNumber(Number(event.target.value), 0, PROCUREMENT_LIMITS.itemQuantityMax),
+                          )
+                        }
                         className="h-11 w-full rounded-xl border border-slate-200 bg-white px-4 text-sm text-slate-900"
                       />
                     </label>

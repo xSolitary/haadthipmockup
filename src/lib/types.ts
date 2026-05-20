@@ -258,6 +258,7 @@ export interface CurrentStoreState {
 
 export interface ProcurementState extends CurrentStoreState {
   isSyncing: boolean;
+  dataMode: "remote" | "local";
   initializeData: () => Promise<void>;
   users: User[];
   memos: MemoRequest[];
