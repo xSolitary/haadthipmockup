@@ -886,11 +886,11 @@ export const useProcurementStore = create<ProcurementState>()(
         patchBootstrapData(set, response.data);
       },
       updatePaymentStatus: async (paymentId, nextStatus: PaymentRequest["status"]) => {
-        void nextStatus;
         const response = await apiFetch<{ data: BootstrapData }>(
           `/api/payment-requests/${paymentId}/advance-status`,
           {
             method: "POST",
+            body: JSON.stringify({ targetStatus: nextStatus }),
           },
         );
         patchBootstrapData(set, response.data);

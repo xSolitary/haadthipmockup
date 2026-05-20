@@ -1,15 +1,16 @@
 import { advancePaymentStatus } from "@/lib/server/procurement";
-import { jsonError } from "@/lib/server/route-utils";
+import { jsonErrorFromUnknown, parseJson } from "@/lib/server/route-utils";
 
 export async function POST(
-  _request: Request,
+  request: Request,
   context: RouteContext<"/api/payment-requests/[paymentId]/advance-status">,
 ) {
   try {
     const { paymentId } = await context.params;
-    return Response.json(await advancePaymentStatus(paymentId));
+    const body = await parseJson<{ targetStatus?: "Pending Invoice" | "Ready for AP Posting" | "Approved for Payment" | "Paid" }>(request);
+    return Response.json(await advancePaymentStatus(paymentId, body.targetStatus));
   } catch (error) {
     console.error(error);
-    return jsonError(error instanceof Error ? error.message : "Failed to advance payment status", 400);
+    return jsonErrorFromUnknown(error, "Failed to advance payment status");
   }
 }

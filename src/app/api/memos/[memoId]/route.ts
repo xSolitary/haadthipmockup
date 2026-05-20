@@ -1,5 +1,5 @@
 import { getMemoById, type MutableMemoPayload, updateMemo } from "@/lib/server/procurement";
-import { jsonError, parseJson } from "@/lib/server/route-utils";
+import { jsonError, jsonErrorFromUnknown, parseJson } from "@/lib/server/route-utils";
 
 export async function GET(_request: Request, context: RouteContext<"/api/memos/[memoId]">) {
   try {
@@ -11,7 +11,7 @@ export async function GET(_request: Request, context: RouteContext<"/api/memos/[
     return Response.json(memo);
   } catch (error) {
     console.error(error);
-    return jsonError("Failed to load memo");
+    return jsonErrorFromUnknown(error, "Failed to load memo");
   }
 }
 
@@ -22,6 +22,6 @@ export async function PATCH(request: Request, context: RouteContext<"/api/memos/
     return Response.json(await updateMemo(memoId, body));
   } catch (error) {
     console.error(error);
-    return jsonError(error instanceof Error ? error.message : "Failed to update memo", 400);
+    return jsonErrorFromUnknown(error, "Failed to update memo");
   }
 }

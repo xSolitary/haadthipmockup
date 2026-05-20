@@ -11,6 +11,30 @@ export const PROCUREMENT_LIMITS = {
   textLongMax: 2_000,
 } as const;
 
+const siteNames = [
+  "Head Office",
+  "Hat Yai Plant",
+  "Surat Thani Distribution Center",
+  "Phuket Sales Office",
+  "Nakhon Si Thammarat Depot",
+] as const;
+
+const procurementCategories = [
+  "Raw Material",
+  "Packaging",
+  "Spare Parts",
+  "Factory Supplies",
+  "Marketing / POSM",
+  "Fleet / Vehicle",
+  "IT / Office",
+  "Service / Contractor",
+] as const;
+
+const memoUrgencies = ["Normal", "Urgent", "Emergency"] as const;
+const poApprovalStatuses = ["Pending", "Approved", "Rejected"] as const;
+const receivingConditions = ["Good", "Damaged", "Partial"] as const;
+const qcStatuses = ["Pending QC", "QC Passed", "QC Failed", "Quarantine", "Not Required"] as const;
+
 type MutableMemoPayloadLike = Omit<
   MemoRequest,
   | "id"
@@ -107,6 +131,23 @@ function assertBoolean(value: unknown, field: string, options: { optional?: bool
   return value;
 }
 
+function assertEnumValue<const T extends readonly string[]>(
+  value: unknown,
+  field: string,
+  allowedValues: T,
+  options: { optional?: boolean } = {},
+) {
+  if (value == null && options.optional) {
+    return undefined;
+  }
+
+  if (typeof value !== "string" || !allowedValues.includes(value)) {
+    throw new Error(`${field} is invalid`);
+  }
+
+  return value as T[number];
+}
+
 function assertStringArray(value: unknown, field: string, maxItems: number, maxLength: number) {
   if (!Array.isArray(value)) {
     throw new Error(`${field} must be an array`);
@@ -167,8 +208,13 @@ function validateMemoItems(items: unknown): MemoItem[] {
       0,
       PROCUREMENT_LIMITS.unitPriceMax,
     );
+    const category = assertEnumValue(
+      typedItem.category,
+      `items[${index}].category`,
+      procurementCategories,
+    );
 
-    if (!name || quantity === undefined || !unit || unitPrice === undefined) {
+    if (!name || quantity === undefined || !unit || unitPrice === undefined || !category) {
       throw new Error(`items[${index}] is invalid`);
     }
 
@@ -178,6 +224,7 @@ function validateMemoItems(items: unknown): MemoItem[] {
       quantity,
       unit,
       unitPrice,
+      category,
     };
   });
 }
@@ -221,6 +268,10 @@ export function validateMemoPayload(
     );
   }
 
+  if (!partial || payload.site !== undefined) {
+    validated.site = assertEnumValue(payload.site, "site", siteNames);
+  }
+
   if (!partial || payload.requestDate !== undefined) {
     validated.requestDate = assertDateString(payload.requestDate, "requestDate");
   }
@@ -237,6 +288,10 @@ export function validateMemoPayload(
     validated.title = assertNonEmptyString(payload.title, "title", PROCUREMENT_LIMITS.textMediumMax);
   }
 
+  if (!partial || payload.category !== undefined) {
+    validated.category = assertEnumValue(payload.category, "category", procurementCategories);
+  }
+
   if (!partial || payload.purpose !== undefined) {
     validated.purpose = assertNonEmptyString(payload.purpose, "purpose", PROCUREMENT_LIMITS.textLongMax);
   }
@@ -247,6 +302,10 @@ export function validateMemoPayload(
       "budgetCode",
       PROCUREMENT_LIMITS.textShortMax,
     );
+  }
+
+  if (!partial || payload.urgency !== undefined) {
+    validated.urgency = assertEnumValue(payload.urgency, "urgency", memoUrgencies);
   }
 
   if (!partial || payload.deliveryLocation !== undefined) {
@@ -281,6 +340,15 @@ export function validateMemoPayload(
       "poAmount",
       0,
       PROCUREMENT_LIMITS.budgetAmountMax,
+      { optional: true },
+    );
+  }
+
+  if (!partial || payload.poApprovalStatus !== undefined) {
+    validated.poApprovalStatus = assertEnumValue(
+      payload.poApprovalStatus,
+      "poApprovalStatus",
+      poApprovalStatuses,
       { optional: true },
     );
   }
@@ -421,33 +489,18 @@ export function validateReceivingPayload(payload: MutableReceivingPayloadLike) {
     throw new Error("Receiving payload is invalid");
   }
 
-  if (
-    payload.condition !== "Good" &&
-    payload.condition !== "Damaged" &&
-    payload.condition !== "Partial"
-  ) {
-    throw new Error("condition is invalid");
-  }
-
-  if (
-    payload.qcStatus !== "Pending QC" &&
-    payload.qcStatus !== "QC Passed" &&
-    payload.qcStatus !== "QC Failed" &&
-    payload.qcStatus !== "Quarantine" &&
-    payload.qcStatus !== "Not Required"
-  ) {
-    throw new Error("qcStatus is invalid");
-  }
+  const condition = assertEnumValue(payload.condition, "condition", receivingConditions);
+  const qcStatus = assertEnumValue(payload.qcStatus, "qcStatus", qcStatuses);
 
   if (expiryDate < deliveryDate) {
     throw new Error("expiryDate must be on or after deliveryDate");
   }
 
-  if (qcRequired && payload.qcStatus === "Not Required") {
+  if (qcRequired && qcStatus === "Not Required") {
     throw new Error("qcStatus cannot be 'Not Required' when qcRequired is true");
   }
 
-  if (!qcRequired && payload.qcStatus !== "Not Required") {
+  if (!qcRequired && qcStatus !== "Not Required") {
     throw new Error("qcStatus must be 'Not Required' when qcRequired is false");
   }
 
@@ -455,11 +508,13 @@ export function validateReceivingPayload(payload: MutableReceivingPayloadLike) {
     ...payload,
     deliveryDate,
     receivedQty,
+    condition,
     lotNumber,
     batchNumber,
     expiryDate,
     coaMsds,
     qcRequired,
+    qcStatus,
     notes,
   };
 }

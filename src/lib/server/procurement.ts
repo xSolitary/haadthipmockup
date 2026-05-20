@@ -34,6 +34,7 @@ import type {
   VendorProposal,
 } from "@/lib/types";
 import { prisma } from "@/lib/server/prisma";
+import { HttpError } from "@/lib/server/route-utils";
 
 export interface BootstrapData {
   users: User[];
@@ -331,6 +332,20 @@ function createEntityId(prefix: string) {
   return `${prefix}-${crypto.randomUUID()}`;
 }
 
+function assertFound<T>(value: T | null | undefined, message: string) {
+  if (!value) {
+    throw new HttpError(message, 404);
+  }
+
+  return value;
+}
+
+function assertTransition(condition: boolean, message: string) {
+  if (!condition) {
+    throw new HttpError(message, 409);
+  }
+}
+
 function calculateTotal(items: Array<{ quantity: number; unitPrice: number }>) {
   return items.reduce((sum, item) => sum + item.quantity * item.unitPrice, 0);
 }
@@ -531,7 +546,7 @@ async function getActor(actorId?: string) {
 async function requireActor(actorId?: string) {
   const actor = await getActor(actorId);
   if (!actor) {
-    throw new Error("Actor not found");
+    throw new HttpError("Actor not found", 404);
   }
   return actor;
 }
@@ -791,10 +806,11 @@ async function updateMemoItems(tx: Prisma.TransactionClient, memoId: string, ite
 export async function updateMemo(memoId: string, updates: Partial<MutableMemoPayload>) {
   const validatedUpdates = validateMemoPayload(updates, { partial: true });
   await prisma.$transaction(async (tx) => {
-    const memo = await tx.memo.findUnique({ where: { id: memoId } });
-    if (!memo) {
-      throw new Error("Memo not found");
-    }
+    const memo = assertFound(await tx.memo.findUnique({ where: { id: memoId } }), "Memo not found");
+    assertTransition(
+      memo.status === PrismaMemoStatus.Draft || memo.status === PrismaMemoStatus.RevisionRequired,
+      "Only draft or revision-required memos can be edited",
+    );
 
     if (validatedUpdates.items) {
       await updateMemoItems(tx, memoId, validatedUpdates.items);
@@ -839,10 +855,11 @@ export async function updateMemo(memoId: string, updates: Partial<MutableMemoPay
 export async function submitMemo(memoId: string, actorId?: string) {
   const actor = await requireActor(actorId);
   await prisma.$transaction(async (tx) => {
-    const memo = await tx.memo.findUnique({ where: { id: memoId } });
-    if (!memo) {
-      throw new Error("Memo not found");
-    }
+    const memo = assertFound(await tx.memo.findUnique({ where: { id: memoId } }), "Memo not found");
+    assertTransition(
+      memo.status === PrismaMemoStatus.Draft || memo.status === PrismaMemoStatus.RevisionRequired,
+      "Only draft or revision-required memos can be submitted",
+    );
 
     await tx.memo.update({
       where: { id: memoId },
@@ -875,10 +892,11 @@ export async function resubmitMemo(memoId: string, updates: Partial<MutableMemoP
   const validatedUpdates = validateMemoPayload(updates, { partial: true });
   const actor = await requireActor(actorId);
   await prisma.$transaction(async (tx) => {
-    const memo = await tx.memo.findUnique({ where: { id: memoId } });
-    if (!memo) {
-      throw new Error("Memo not found");
-    }
+    const memo = assertFound(await tx.memo.findUnique({ where: { id: memoId } }), "Memo not found");
+    assertTransition(
+      memo.status === PrismaMemoStatus.RevisionRequired,
+      "Only revision-required memos can be resubmitted",
+    );
 
     if (validatedUpdates.items) {
       await updateMemoItems(tx, memoId, validatedUpdates.items);
@@ -930,10 +948,12 @@ export async function resubmitMemo(memoId: string, updates: Partial<MutableMemoP
 export async function approveMemo(memoId: string, comment: string, actorId?: string) {
   const actor = await requireActor(actorId);
   await prisma.$transaction(async (tx) => {
-    const memo = await tx.memo.findUnique({ where: { id: memoId } });
-    if (!memo) {
-      throw new Error("Memo not found");
-    }
+    const memo = assertFound(await tx.memo.findUnique({ where: { id: memoId } }), "Memo not found");
+    assertTransition(
+      memo.status === PrismaMemoStatus.PendingApproval,
+      "Only pending-approval memos can be approved",
+    );
+    assertTransition(!memo.prNumber && !memo.poNumber, "This memo has already been converted to PR/PO");
 
     const count = await tx.purchaseOrder.count();
     const prNumber = formatDocumentNumber("PR", count + 1);
@@ -992,10 +1012,11 @@ export async function approveMemo(memoId: string, comment: string, actorId?: str
 export async function rejectMemo(memoId: string, comment: string, actorId?: string) {
   const actor = await requireActor(actorId);
   await prisma.$transaction(async (tx) => {
-    const memo = await tx.memo.findUnique({ where: { id: memoId } });
-    if (!memo) {
-      throw new Error("Memo not found");
-    }
+    const memo = assertFound(await tx.memo.findUnique({ where: { id: memoId } }), "Memo not found");
+    assertTransition(
+      memo.status === PrismaMemoStatus.PendingApproval,
+      "Only pending-approval memos can be rejected",
+    );
 
     await tx.memo.update({
       where: { id: memoId },
@@ -1027,10 +1048,11 @@ export async function rejectMemo(memoId: string, comment: string, actorId?: stri
 export async function requestMemoRevision(memoId: string, comment: string, actorId?: string) {
   const actor = await requireActor(actorId);
   await prisma.$transaction(async (tx) => {
-    const memo = await tx.memo.findUnique({ where: { id: memoId } });
-    if (!memo) {
-      throw new Error("Memo not found");
-    }
+    const memo = assertFound(await tx.memo.findUnique({ where: { id: memoId } }), "Memo not found");
+    assertTransition(
+      memo.status === PrismaMemoStatus.PendingApproval,
+      "Only pending-approval memos can request revision",
+    );
 
     await tx.memo.update({
       where: { id: memoId },
@@ -1068,10 +1090,11 @@ export async function addVendorProposal(poId: string, proposal: VendorProposalPa
   const validatedProposal = validateVendorProposalPayload(proposal) as VendorProposalPayload;
   const actor = await requireActor(actorId);
   await prisma.$transaction(async (tx) => {
-    const po = await tx.purchaseOrder.findUnique({ where: { id: poId } });
-    if (!po) {
-      throw new Error("Purchase order not found");
-    }
+    const po = assertFound(await tx.purchaseOrder.findUnique({ where: { id: poId } }), "Purchase order not found");
+    assertTransition(
+      po.procurementStatus === PrismaProcurementStatus.WaitingForPurchasingToProposeVendors,
+      "Vendor proposals can only be added while purchasing is preparing options",
+    );
 
     await tx.vendorProposal.create({
       data: {
@@ -1124,6 +1147,12 @@ export async function updateVendorProposal(
   updates: Partial<VendorProposalPayload>,
 ) {
   const validatedUpdates = validateVendorProposalPayload(updates, { partial: true });
+  const po = assertFound(await prisma.purchaseOrder.findUnique({ where: { id: poId } }), "Purchase order not found");
+  assertTransition(
+    po.procurementStatus === PrismaProcurementStatus.WaitingForPurchasingToProposeVendors,
+    "Vendor proposals can only be edited while purchasing is preparing options",
+  );
+
   await prisma.vendorProposal.update({
     where: { id: proposalId, purchaseOrderId: poId },
     data: {
@@ -1151,6 +1180,12 @@ export async function updateVendorProposal(
 }
 
 export async function deleteVendorProposal(poId: string, proposalId: string) {
+  const po = assertFound(await prisma.purchaseOrder.findUnique({ where: { id: poId } }), "Purchase order not found");
+  assertTransition(
+    po.procurementStatus === PrismaProcurementStatus.WaitingForPurchasingToProposeVendors,
+    "Vendor proposals can only be deleted while purchasing is preparing options",
+  );
+
   await prisma.vendorProposal.delete({
     where: { id: proposalId, purchaseOrderId: poId },
   });
@@ -1168,15 +1203,23 @@ export async function deleteVendorProposal(poId: string, proposalId: string) {
 
 export async function submitVendorProposals(poId: string, proposalIds: string[], actorId?: string) {
   if (proposalIds.length === 0) {
-    throw new Error("Select at least one vendor proposal before submitting");
+    throw new HttpError("Select at least one vendor proposal before submitting", 400);
   }
 
   const actor = await requireActor(actorId);
   await prisma.$transaction(async (tx) => {
-    const po = await tx.purchaseOrder.findUnique({ where: { id: poId } });
-    if (!po) {
-      throw new Error("Purchase order not found");
-    }
+    const po = assertFound(await tx.purchaseOrder.findUnique({ where: { id: poId } }), "Purchase order not found");
+    assertTransition(
+      po.procurementStatus === PrismaProcurementStatus.WaitingForPurchasingToProposeVendors,
+      "Vendor proposals can only be submitted from the purchasing stage",
+    );
+    const matchingProposalCount = await tx.vendorProposal.count({
+      where: { purchaseOrderId: poId, id: { in: proposalIds } },
+    });
+    assertTransition(
+      matchingProposalCount === proposalIds.length,
+      "One or more selected vendor proposals were not found for this purchase order",
+    );
 
     await tx.vendorProposal.updateMany({
       where: { purchaseOrderId: poId },
@@ -1231,16 +1274,27 @@ export async function submitVendorProposals(poId: string, proposalIds: string[],
 export async function approveVendorSelection(poId: string, proposalId: string, comment: string, actorId?: string) {
   const actor = await requireActor(actorId);
   await prisma.$transaction(async (tx) => {
-    const po = await tx.purchaseOrder.findUnique({
-      where: { id: poId },
-    });
-    const proposal = await tx.vendorProposal.findUnique({
-      where: { id: proposalId },
-    });
-
-    if (!po || !proposal || proposal.purchaseOrderId !== poId) {
-      throw new Error("Vendor proposal not found");
-    }
+    const po = assertFound(
+      await tx.purchaseOrder.findUnique({
+        where: { id: poId },
+      }),
+      "Purchase order not found",
+    );
+    const proposal = assertFound(
+      await tx.vendorProposal.findUnique({
+        where: { id: proposalId },
+      }),
+      "Vendor proposal not found",
+    );
+    assertTransition(proposal.purchaseOrderId === poId, "Vendor proposal not found");
+    assertTransition(
+      po.procurementStatus === PrismaProcurementStatus.PendingVendorApproval,
+      "Vendor selection can only be approved after proposals are submitted",
+    );
+    assertTransition(
+      proposal.submittedToApprover,
+      "Only vendor proposals submitted to the approver can be approved",
+    );
 
     await tx.purchaseOrder.update({
       where: { id: poId },
@@ -1291,10 +1345,13 @@ export async function receivePurchaseOrder(
 ) {
   const validatedPayload = validateReceivingPayload(payload) as typeof payload;
   await prisma.$transaction(async (tx) => {
-    const po = await tx.purchaseOrder.findUnique({ where: { id: poId } });
-    if (!po) {
-      throw new Error("Purchase order not found");
-    }
+    const po = assertFound(await tx.purchaseOrder.findUnique({ where: { id: poId } }), "Purchase order not found");
+    assertTransition(
+      po.procurementStatus === PrismaProcurementStatus.SentToVendor ||
+        po.procurementStatus === PrismaProcurementStatus.PendingReceiving ||
+        po.procurementStatus === PrismaProcurementStatus.Received,
+      "This purchase order is not ready for receiving",
+    );
 
     const recordId =
       (await tx.receivingRecord.findFirst({ where: { poId }, select: { id: true } }))?.id ??
@@ -1360,11 +1417,16 @@ export async function receivePurchaseOrder(
 
 export async function markQcPassed(poId: string) {
   await prisma.$transaction(async (tx) => {
-    const po = await tx.purchaseOrder.findUnique({ where: { id: poId } });
-    const receiving = await tx.receivingRecord.findFirst({ where: { poId } });
-    if (!po || !receiving) {
-      throw new Error("Receiving record not found");
-    }
+    const po = assertFound(await tx.purchaseOrder.findUnique({ where: { id: poId } }), "Purchase order not found");
+    const receiving = assertFound(
+      await tx.receivingRecord.findFirst({ where: { poId } }),
+      "Receiving record not found",
+    );
+    assertTransition(receiving.qcRequired, "QC cannot be marked as passed for records that do not require QC");
+    assertTransition(
+      receiving.qcStatus !== PrismaQCStatus.QCPassed,
+      "QC has already been marked as passed",
+    );
 
     await tx.receivingRecord.update({
       where: { id: receiving.id },
@@ -1421,12 +1483,12 @@ export async function markQcPassed(poId: string) {
   };
 }
 
-export async function advancePaymentStatus(paymentId: string) {
+export async function advancePaymentStatus(paymentId: string, targetStatus?: PaymentRequest["status"]) {
   await prisma.$transaction(async (tx) => {
-    const payment = await tx.paymentRequest.findUnique({ where: { id: paymentId } });
-    if (!payment) {
-      throw new Error("Payment request not found");
-    }
+    const payment = assertFound(
+      await tx.paymentRequest.findUnique({ where: { id: paymentId } }),
+      "Payment request not found",
+    );
 
     const nextStatus =
       payment.status === PrismaPaymentStatus.PendingInvoice
@@ -1434,8 +1496,14 @@ export async function advancePaymentStatus(paymentId: string) {
         : payment.status === PrismaPaymentStatus.ReadyForAPPosting
           ? PrismaPaymentStatus.ApprovedForPayment
           : payment.status === PrismaPaymentStatus.ApprovedForPayment
-            ? PrismaPaymentStatus.Paid
-            : PrismaPaymentStatus.Paid;
+          ? PrismaPaymentStatus.Paid
+          : PrismaPaymentStatus.Paid;
+    const requestedStatus = targetStatus ? paymentStatusToDb[targetStatus] : undefined;
+    assertTransition(payment.status !== PrismaPaymentStatus.Paid, "Payment has already been completed");
+    assertTransition(
+      requestedStatus === undefined || requestedStatus === nextStatus,
+      "Requested payment status does not match the next valid transition",
+    );
 
     await tx.paymentRequest.update({
       where: { id: paymentId },

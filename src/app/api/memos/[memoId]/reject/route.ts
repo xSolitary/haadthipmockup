@@ -1,4 +1,4 @@
-import { jsonError, parseJson } from "@/lib/server/route-utils";
+import { jsonErrorFromUnknown, parseJson } from "@/lib/server/route-utils";
 import { rejectMemo } from "@/lib/server/procurement";
 
 export async function POST(request: Request, context: RouteContext<"/api/memos/[memoId]/reject">) {
@@ -8,6 +8,6 @@ export async function POST(request: Request, context: RouteContext<"/api/memos/[
     return Response.json(await rejectMemo(memoId, body.comment ?? "", body.actorId));
   } catch (error) {
     console.error(error);
-    return jsonError(error instanceof Error ? error.message : "Failed to reject memo", 400);
+    return jsonErrorFromUnknown(error, "Failed to reject memo");
   }
 }

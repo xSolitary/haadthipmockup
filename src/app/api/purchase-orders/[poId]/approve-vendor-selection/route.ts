@@ -1,5 +1,5 @@
 import { approveVendorSelection } from "@/lib/server/procurement";
-import { jsonError, parseJson } from "@/lib/server/route-utils";
+import { jsonErrorFromUnknown, parseJson } from "@/lib/server/route-utils";
 
 export async function POST(
   request: Request,
@@ -13,9 +13,6 @@ export async function POST(
     );
   } catch (error) {
     console.error(error);
-    return jsonError(
-      error instanceof Error ? error.message : "Failed to approve vendor selection",
-      400,
-    );
+    return jsonErrorFromUnknown(error, "Failed to approve vendor selection");
   }
 }

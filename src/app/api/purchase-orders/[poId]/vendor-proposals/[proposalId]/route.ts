@@ -3,7 +3,7 @@ import {
   type VendorProposalPayload,
   updateVendorProposal,
 } from "@/lib/server/procurement";
-import { jsonError, parseJson } from "@/lib/server/route-utils";
+import { jsonErrorFromUnknown, parseJson } from "@/lib/server/route-utils";
 
 export async function PATCH(
   request: Request,
@@ -15,7 +15,7 @@ export async function PATCH(
     return Response.json(await updateVendorProposal(poId, proposalId, body));
   } catch (error) {
     console.error(error);
-    return jsonError(error instanceof Error ? error.message : "Failed to update vendor proposal", 400);
+    return jsonErrorFromUnknown(error, "Failed to update vendor proposal");
   }
 }
 
@@ -28,6 +28,6 @@ export async function DELETE(
     return Response.json(await deleteVendorProposal(poId, proposalId));
   } catch (error) {
     console.error(error);
-    return jsonError(error instanceof Error ? error.message : "Failed to delete vendor proposal", 400);
+    return jsonErrorFromUnknown(error, "Failed to delete vendor proposal");
   }
 }

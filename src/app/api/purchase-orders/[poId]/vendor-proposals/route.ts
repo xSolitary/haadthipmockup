@@ -1,5 +1,5 @@
 import { addVendorProposal, type VendorProposalPayload } from "@/lib/server/procurement";
-import { jsonError, parseJson } from "@/lib/server/route-utils";
+import { jsonErrorFromUnknown, parseJson } from "@/lib/server/route-utils";
 
 export async function POST(
   request: Request,
@@ -11,6 +11,6 @@ export async function POST(
     return Response.json(await addVendorProposal(poId, body.proposal, body.actorId));
   } catch (error) {
     console.error(error);
-    return jsonError(error instanceof Error ? error.message : "Failed to add vendor proposal", 400);
+    return jsonErrorFromUnknown(error, "Failed to add vendor proposal");
   }
 }

@@ -1,4 +1,4 @@
-import { jsonError, parseJson } from "@/lib/server/route-utils";
+import { jsonErrorFromUnknown, parseJson } from "@/lib/server/route-utils";
 import { submitVendorProposals } from "@/lib/server/procurement";
 
 export async function POST(
@@ -11,9 +11,6 @@ export async function POST(
     return Response.json(await submitVendorProposals(poId, body.proposalIds, body.actorId));
   } catch (error) {
     console.error(error);
-    return jsonError(
-      error instanceof Error ? error.message : "Failed to submit vendor proposals",
-      400,
-    );
+    return jsonErrorFromUnknown(error, "Failed to submit vendor proposals");
   }
 }

@@ -1,4 +1,4 @@
-import { jsonError, parseJson } from "@/lib/server/route-utils";
+import { jsonErrorFromUnknown, parseJson } from "@/lib/server/route-utils";
 import { receivePurchaseOrder } from "@/lib/server/procurement";
 
 export async function POST(
@@ -11,6 +11,6 @@ export async function POST(
     return Response.json(await receivePurchaseOrder(poId, body as never));
   } catch (error) {
     console.error(error);
-    return jsonError(error instanceof Error ? error.message : "Failed to receive purchase order", 400);
+    return jsonErrorFromUnknown(error, "Failed to receive purchase order");
   }
 }

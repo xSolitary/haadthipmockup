@@ -1,4 +1,4 @@
-import { jsonError, parseJson } from "@/lib/server/route-utils";
+import { jsonErrorFromUnknown, parseJson } from "@/lib/server/route-utils";
 import { submitMemo } from "@/lib/server/procurement";
 
 export async function POST(request: Request, context: RouteContext<"/api/memos/[memoId]/submit">) {
@@ -8,6 +8,6 @@ export async function POST(request: Request, context: RouteContext<"/api/memos/[
     return Response.json(await submitMemo(memoId, body.actorId));
   } catch (error) {
     console.error(error);
-    return jsonError(error instanceof Error ? error.message : "Failed to submit memo", 400);
+    return jsonErrorFromUnknown(error, "Failed to submit memo");
   }
 }
