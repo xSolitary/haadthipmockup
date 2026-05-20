@@ -26,6 +26,10 @@ function clampNumber(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), max);
 }
 
+function getErrorMessage(error: unknown) {
+  return error instanceof Error ? error.message : "ข้อมูลไม่ถูกต้อง โปรดใส่ใหม่";
+}
+
 const emptyProposalForm = {
   vendorName: "",
   quotedPrice: "",
@@ -117,6 +121,7 @@ export function VendorProposalActionPage({ poId }: { poId: string }) {
   });
   const [isSubmitConfirmOpen, setIsSubmitConfirmOpen] = useState(false);
   const [isAutoFilling, setIsAutoFilling] = useState(false);
+  const [formError, setFormError] = useState("");
 
   const submittedProposals = useMemo(
     () => purchaseOrder?.vendorProposals.filter((proposal) => proposal.submittedToApprover) ?? [],
@@ -131,6 +136,7 @@ export function VendorProposalActionPage({ poId }: { poId: string }) {
   const handleSaveProposal = async () => {
     if (!purchaseOrder || !proposalForm.vendorName.trim()) return;
 
+    setFormError("");
     const payload = {
       vendorId: null,
       vendorName: proposalForm.vendorName.trim(),
@@ -143,19 +149,24 @@ export function VendorProposalActionPage({ poId }: { poId: string }) {
       submittedToApprover: false,
     };
 
-    if (editingProposalId) {
-      await updateVendorProposal(purchaseOrder.id, editingProposalId, payload);
-    } else {
-      await addVendorProposal(purchaseOrder.id, payload);
-    }
+    try {
+      if (editingProposalId) {
+        await updateVendorProposal(purchaseOrder.id, editingProposalId, payload);
+      } else {
+        await addVendorProposal(purchaseOrder.id, payload);
+      }
 
-    resetForm();
+      resetForm();
+    } catch (error) {
+      setFormError(getErrorMessage(error));
+    }
   };
 
   const handleAutoFill = async () => {
     if (!purchaseOrder || isAutoFilling) return;
 
     setIsAutoFilling(true);
+    setFormError("");
     try {
       const existingNames = new Set(
         purchaseOrder.vendorProposals.map((proposal) => proposal.vendorName.trim().toLowerCase()),
@@ -180,6 +191,8 @@ export function VendorProposalActionPage({ poId }: { poId: string }) {
       }
 
       resetForm();
+    } catch (error) {
+      setFormError(getErrorMessage(error));
     } finally {
       setIsAutoFilling(false);
     }
@@ -264,6 +277,11 @@ export function VendorProposalActionPage({ poId }: { poId: string }) {
       />
       <div className="grid gap-6 xl:grid-cols-[2fr_1fr]">
         <div className="space-y-6">
+          {formError ? (
+            <div className="rounded-[24px] border border-rose-200 bg-rose-50 px-5 py-4 text-sm text-rose-700">
+              {formError}
+            </div>
+          ) : null}
           <FormSection title="สรุป PR" description="รายละเอียดคำขอที่อยู่ในขั้นตอนคัดเลือก Vendor">
             <div className="grid gap-4 md:grid-cols-2">
               <div className="rounded-[20px] border border-slate-200 bg-slate-50 p-4">

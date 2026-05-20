@@ -1,3 +1,5 @@
+import { ValidationError } from "@/lib/procurement-validation";
+
 export function jsonError(message: string, status = 500) {
   return Response.json({ error: message }, { status });
 }
@@ -23,6 +25,10 @@ export function jsonErrorFromUnknown(error: unknown, fallbackMessage: string) {
 
   if (error instanceof SyntaxError) {
     return jsonError("Invalid JSON request body", 400);
+  }
+
+  if (error instanceof ValidationError) {
+    return jsonError(error.message, 400);
   }
 
   return jsonError(fallbackMessage);

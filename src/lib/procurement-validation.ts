@@ -1,5 +1,12 @@
 import type { MemoItem, MemoRequest, ReceivingRecord, VendorProposal } from "@/lib/types";
 
+export class ValidationError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "ValidationError";
+  }
+}
+
 export const PROCUREMENT_LIMITS = {
   attachmentsPerMemo: 10,
   itemsPerMemo: 100,
@@ -54,6 +61,54 @@ type MutableReceivingPayloadLike = Omit<
   "id" | "poId" | "poNumber" | "vendorName"
 >;
 
+function failValidation(message: string): never {
+  throw new ValidationError(message);
+}
+
+function formatCurrencyAmount(value: number) {
+  return new Intl.NumberFormat("th-TH").format(value);
+}
+
+function getFieldLabel(field: string) {
+  if (field.includes("unitPrice") || field === "quotedPrice" || field === "poAmount") {
+    return "ราคา";
+  }
+
+  if (field.includes("quantity") || field === "receivedQty") {
+    return "จำนวน";
+  }
+
+  if (field === "budgetRemaining") {
+    return "งบคงเหลือ";
+  }
+
+  if (field === "requiredDate") {
+    return "วันที่ต้องการใช้";
+  }
+
+  if (field === "requestDate") {
+    return "วันที่ขอ";
+  }
+
+  if (field === "deliveryDate") {
+    return "วันที่ส่งมอบ";
+  }
+
+  if (field === "expiryDate") {
+    return "วันหมดอายุ";
+  }
+
+  if (field.includes("name") || field === "vendorName" || field === "title") {
+    return "ข้อมูลที่กรอก";
+  }
+
+  return "ข้อมูล";
+}
+
+function createRetryMessage(field: string) {
+  return `${getFieldLabel(field)}ไม่ถูกต้อง โปรดใส่ใหม่`;
+}
+
 function assertNonEmptyString(
   value: unknown,
   field: string,
@@ -65,16 +120,16 @@ function assertNonEmptyString(
   }
 
   if (typeof value !== "string") {
-    throw new Error(`${field} must be a string`);
+    failValidation(createRetryMessage(field));
   }
 
   const trimmed = value.trim();
   if (!trimmed) {
-    throw new Error(`${field} is required`);
+    failValidation(createRetryMessage(field));
   }
 
   if (trimmed.length > maxLength) {
-    throw new Error(`${field} must be ${maxLength} characters or less`);
+    failValidation(createRetryMessage(field));
   }
 
   return trimmed;
@@ -86,12 +141,12 @@ function assertDateString(value: unknown, field: string, options: { optional?: b
   }
 
   if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
-    throw new Error(`${field} must use YYYY-MM-DD format`);
+    failValidation(createRetryMessage(field));
   }
 
   const parsed = new Date(`${value}T00:00:00.000Z`);
   if (Number.isNaN(parsed.getTime())) {
-    throw new Error(`${field} is invalid`);
+    failValidation(createRetryMessage(field));
   }
 
   return value;
@@ -109,11 +164,15 @@ function assertFiniteNumber(
   }
 
   if (typeof value !== "number" || !Number.isFinite(value)) {
-    throw new Error(`${field} must be a finite number`);
+    failValidation(createRetryMessage(field));
+  }
+
+  if (value > PROCUREMENT_LIMITS.unitPriceMax && (field.includes("unitPrice") || field === "quotedPrice")) {
+    failValidation(`ราคาเกิน ${formatCurrencyAmount(PROCUREMENT_LIMITS.unitPriceMax)} บาท โปรดใส่ใหม่`);
   }
 
   if (value < min || value > max) {
-    throw new Error(`${field} must be between ${min} and ${max}`);
+    failValidation(createRetryMessage(field));
   }
 
   return value;
@@ -125,7 +184,7 @@ function assertBoolean(value: unknown, field: string, options: { optional?: bool
   }
 
   if (typeof value !== "boolean") {
-    throw new Error(`${field} must be true or false`);
+    failValidation(createRetryMessage(field));
   }
 
   return value;
@@ -142,7 +201,7 @@ function assertEnumValue<const T extends readonly string[]>(
   }
 
   if (typeof value !== "string" || !allowedValues.includes(value)) {
-    throw new Error(`${field} is invalid`);
+    failValidation(createRetryMessage(field));
   }
 
   return value as T[number];
@@ -150,17 +209,17 @@ function assertEnumValue<const T extends readonly string[]>(
 
 function assertStringArray(value: unknown, field: string, maxItems: number, maxLength: number) {
   if (!Array.isArray(value)) {
-    throw new Error(`${field} must be an array`);
+    failValidation(createRetryMessage(field));
   }
 
   if (value.length > maxItems) {
-    throw new Error(`${field} must contain at most ${maxItems} items`);
+    failValidation(createRetryMessage(field));
   }
 
   return value.map((entry, index) => {
     const validatedEntry = assertNonEmptyString(entry, `${field}[${index}]`, maxLength);
     if (!validatedEntry) {
-      throw new Error(`${field}[${index}] is required`);
+      failValidation(createRetryMessage(`${field}[${index}]`));
     }
 
     return validatedEntry;
@@ -169,20 +228,20 @@ function assertStringArray(value: unknown, field: string, maxItems: number, maxL
 
 function validateMemoItems(items: unknown): MemoItem[] {
   if (!Array.isArray(items)) {
-    throw new Error("items must be an array");
+    failValidation("รายการสินค้าไม่ถูกต้อง โปรดใส่ใหม่");
   }
 
   if (items.length === 0) {
-    throw new Error("At least one item is required");
+    failValidation("กรุณาเพิ่มรายการสินค้าอย่างน้อย 1 รายการ");
   }
 
   if (items.length > PROCUREMENT_LIMITS.itemsPerMemo) {
-    throw new Error(`A memo can contain at most ${PROCUREMENT_LIMITS.itemsPerMemo} items`);
+    failValidation(`รายการสินค้าเกิน ${PROCUREMENT_LIMITS.itemsPerMemo} รายการ โปรดใส่ใหม่`);
   }
 
   return items.map((item, index) => {
     if (!item || typeof item !== "object") {
-      throw new Error(`items[${index}] is invalid`);
+      failValidation(`รายการที่ ${index + 1} ไม่ถูกต้อง โปรดใส่ใหม่`);
     }
 
     const typedItem = item as MemoItem;
@@ -215,7 +274,7 @@ function validateMemoItems(items: unknown): MemoItem[] {
     );
 
     if (!name || quantity === undefined || !unit || unitPrice === undefined || !category) {
-      throw new Error(`items[${index}] is invalid`);
+      failValidation(`รายการที่ ${index + 1} ไม่ถูกต้อง โปรดใส่ใหม่`);
     }
 
     return {
@@ -281,7 +340,7 @@ export function validateMemoPayload(
   }
 
   if (validated.requestDate && validated.requiredDate && validated.requiredDate < validated.requestDate) {
-    throw new Error("requiredDate must be on or after requestDate");
+    failValidation("วันที่ต้องการใช้ต้องไม่น้อยกว่าวันที่ขอ โปรดใส่ใหม่");
   }
 
   if (!partial || payload.title !== undefined) {
@@ -369,7 +428,9 @@ export function validateMemoPayload(
     );
 
     if (estimatedTotal > PROCUREMENT_LIMITS.budgetAmountMax) {
-      throw new Error(`estimatedTotal must not exceed ${PROCUREMENT_LIMITS.budgetAmountMax}`);
+      failValidation(
+        `มูลค่ารวมเกิน ${formatCurrencyAmount(PROCUREMENT_LIMITS.budgetAmountMax)} บาท โปรดใส่ใหม่`,
+      );
     }
   }
 
@@ -486,22 +547,22 @@ export function validateReceivingPayload(payload: MutableReceivingPayloadLike) {
     qcRequired === undefined ||
     !notes
   ) {
-    throw new Error("Receiving payload is invalid");
+    failValidation("ข้อมูลการรับของไม่ถูกต้อง โปรดใส่ใหม่");
   }
 
   const condition = assertEnumValue(payload.condition, "condition", receivingConditions);
   const qcStatus = assertEnumValue(payload.qcStatus, "qcStatus", qcStatuses);
 
   if (expiryDate < deliveryDate) {
-    throw new Error("expiryDate must be on or after deliveryDate");
+    failValidation("วันหมดอายุต้องไม่น้อยกว่าวันที่ส่งมอบ โปรดใส่ใหม่");
   }
 
   if (qcRequired && qcStatus === "Not Required") {
-    throw new Error("qcStatus cannot be 'Not Required' when qcRequired is true");
+    failValidation("สถานะ QC ไม่ถูกต้อง โปรดใส่ใหม่");
   }
 
   if (!qcRequired && qcStatus !== "Not Required") {
-    throw new Error("qcStatus must be 'Not Required' when qcRequired is false");
+    failValidation("สถานะ QC ไม่ถูกต้อง โปรดใส่ใหม่");
   }
 
   return {

@@ -53,6 +53,10 @@ function clampNumber(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), max);
 }
 
+function getErrorMessage(error: unknown) {
+  return error instanceof Error ? error.message : "ข้อมูลไม่ถูกต้อง โปรดใส่ใหม่";
+}
+
 function createBlankItem(index: number): MemoItem {
   return {
     id: `item-${index}`,
@@ -168,6 +172,7 @@ export function MemoEditorPage({ memoId }: { memoId?: string }) {
   const [isCreateConfirmOpen, setIsCreateConfirmOpen] = useState(false);
   const [successModal, setSuccessModal] = useState<EditorSuccessModalState>(defaultSuccessModalState);
   const [isCompletingResubmit, setIsCompletingResubmit] = useState(false);
+  const [formError, setFormError] = useState("");
 
   const shouldShowEditor = !isEditing || Boolean(editingMemo) && (canEdit || successModal.open || isCompletingResubmit);
 
@@ -246,6 +251,7 @@ export function MemoEditorPage({ memoId }: { memoId?: string }) {
     if (isSubmitting) return;
 
     setIsSubmitting(true);
+    setFormError("");
     try {
       if (isEditing && editingMemo) {
         await updateMemo(editingMemo.id, payload);
@@ -254,6 +260,8 @@ export function MemoEditorPage({ memoId }: { memoId?: string }) {
         const createdMemoId = await createMemo(payload);
         router.push(`/my-requests?tab=memo&highlightId=${createdMemoId}`);
       }
+    } catch (error) {
+      setFormError(getErrorMessage(error));
     } finally {
       setIsSubmitting(false);
     }
@@ -263,6 +271,7 @@ export function MemoEditorPage({ memoId }: { memoId?: string }) {
     if (isSubmitting) return;
 
     setIsSubmitting(true);
+    setFormError("");
     try {
       if (isEditing && editingMemo) {
         if (editingMemo.status === "Revision Required") {
@@ -299,6 +308,8 @@ export function MemoEditorPage({ memoId }: { memoId?: string }) {
           redirectId: createdMemoId,
         });
       }
+    } catch (error) {
+      setFormError(getErrorMessage(error));
     } finally {
       setIsSubmitting(false);
     }
@@ -328,6 +339,12 @@ export function MemoEditorPage({ memoId }: { memoId?: string }) {
       />
       <div className="grid gap-6 xl:grid-cols-[2fr_1fr]">
         <div className="space-y-6">
+          {formError ? (
+            <div className="rounded-[24px] border border-rose-200 bg-rose-50 px-5 py-4 text-sm text-rose-700">
+              {formError}
+            </div>
+          ) : null}
+
           {isRevision && latestRevisionReason ? (
             <div className="rounded-[24px] border border-amber-200 bg-amber-50 px-5 py-4 text-sm text-amber-900">
               <p className="font-semibold">เหตุผลที่ถูกปฏิเสธ: {latestRevisionReason}</p>
