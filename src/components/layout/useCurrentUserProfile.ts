@@ -36,6 +36,7 @@ export function useCurrentUserProfile() {
 
   return {
     currentUser,
+    currentRole,
     currentUsername,
     initials: getInitials(currentUser?.name),
     roleLabel,

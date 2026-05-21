@@ -270,7 +270,7 @@ export interface ProcurementState extends CurrentStoreState {
   paymentRequests: PaymentRequest[];
   vendorDeliveries: Record<string, VendorDeliveryUpdate>;
   login: (username: string, password: string) => { success: true } | { success: false; error: string };
-  loginAsRole: (role: Extract<Role, "Requester" | "Approver" | "Purchasing" | "Finance" | "Vendor">) => void;
+  loginAsRole: (role: Extract<Role, "Requester" | "Approver" | "Purchasing" | "Vendor" | "Admin">) => void;
   logout: () => void;
   switchRole: (role: Role) => void;
   createMemo: (memo: Omit<MemoRequest, "id" | "documentNumber" | "createdAt" | "updatedAt" | "history" | "procurementStatus" | "status" | "assignedApproverId" | "currentApproverName" | "estimatedTotal">) => Promise<string>;

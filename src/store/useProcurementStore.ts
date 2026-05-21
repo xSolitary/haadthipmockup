@@ -28,8 +28,8 @@ const noopStorage: StateStorage = {
 };
 
 const allowedLoginRoles: Array<
-  Extract<Role, "Requester" | "Approver" | "Purchasing" | "Finance" | "Vendor">
-> = ["Requester", "Approver", "Purchasing", "Finance", "Vendor"];
+  Extract<Role, "Requester" | "Approver" | "Purchasing" | "Vendor" | "Admin">
+> = ["Requester", "Approver", "Purchasing", "Vendor", "Admin"];
 
 function getBaseState() {
   return {
@@ -161,6 +161,43 @@ function updateMemoInState(
   return memos.map((memo) => (memo.id === memoId ? updater(memo) : memo));
 }
 
+function migratePersistedState(
+  persistedState: unknown,
+  version: number,
+): Partial<ProcurementState> {
+  if (!persistedState || typeof persistedState !== "object") {
+    return {};
+  }
+
+  const nextState = { ...(persistedState as Partial<ProcurementState>) };
+
+  if (version < 5) {
+    const users = Array.isArray(nextState.users)
+      ? nextState.users.filter((user): user is User => Boolean(user) && user.role !== "Finance")
+      : undefined;
+    const currentRole = nextState.currentRole === "Finance" ? defaultRole : nextState.currentRole;
+    const currentUserId =
+      nextState.currentRole === "Finance" || nextState.currentUserId === "u4"
+        ? defaultUserId
+        : nextState.currentUserId;
+    const currentUsername =
+      nextState.currentRole === "Finance" || nextState.currentUsername === "finance"
+        ? null
+        : nextState.currentUsername;
+
+    return {
+      ...nextState,
+      users,
+      currentRole,
+      currentUserId,
+      currentUsername,
+      isAuthenticated: currentRole ? allowedLoginRoles.includes(currentRole as (typeof allowedLoginRoles)[number]) : false,
+    };
+  }
+
+  return nextState;
+}
+
 async function refreshBootstrap(set: (partial: Partial<ProcurementState>) => void) {
   const data = await apiFetch<BootstrapData>("/api/bootstrap");
   patchBootstrapData(set, data);
@@ -233,7 +270,7 @@ export const useProcurementStore = create<ProcurementState>()(
           currentUserId: user?.id ?? defaultUserId,
           currentUsername: role.toLowerCase(),
           isAuthenticated: allowedLoginRoles.includes(
-            role as Extract<Role, "Requester" | "Approver" | "Purchasing" | "Finance" | "Vendor">,
+            role as Extract<Role, "Requester" | "Approver" | "Purchasing" | "Vendor" | "Admin">,
           ),
         });
       },
@@ -898,10 +935,11 @@ export const useProcurementStore = create<ProcurementState>()(
     }),
     {
       name: "ht-procurement-store",
-      version: 4,
+      version: 5,
       storage: createJSONStorage(() =>
         typeof window === "undefined" ? noopStorage : window.localStorage,
       ),
+      migrate: migratePersistedState,
       partialize: (state) => ({
         ...(state.dataMode === "local"
           ? {

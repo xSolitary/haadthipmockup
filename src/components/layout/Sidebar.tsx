@@ -12,23 +12,15 @@ import {
   LogOut,
   Settings,
   Truck,
+  Users,
 } from "lucide-react";
 import { useCurrentUserProfile } from "@/components/layout/useCurrentUserProfile";
-import { useProcurementStore } from "@/store/useProcurementStore";
+import { getNavItemsForRole } from "@/lib/route-access";
 
-const defaultNavItems = [
-  { label: "แดชบอร์ด", href: "/", icon: Home },
-  { label: "ระบบจัดซื้อ", href: "/my-requests", icon: Layers },
-  { label: "ตรวจรับสินค้า", href: "/receiving", icon: Truck },
-  { label: "จ่ายเงิน", href: "/payment", icon: CreditCard },
-  { label: "รายงาน", href: "/reports", icon: BarChart3 },
-  { label: "ตั้งค่าระบบ", href: "/admin", icon: Settings },
-];
-
-const vendorNavItems = [
-  { label: "PO / งานจัดส่ง", href: "/my-requests?tab=po", icon: Layers },
-  { label: "ตรวจรับสินค้า", href: "/receiving", icon: Truck },
-];
+interface SidebarProps {
+  isCollapsed: boolean;
+  onToggleCollapse: () => void;
+}
 
 function HaadthipWordmark({ isCollapsed }: { isCollapsed: boolean }) {
   if (isCollapsed) {
@@ -58,16 +50,19 @@ function HaadthipWordmark({ isCollapsed }: { isCollapsed: boolean }) {
   );
 }
 
-interface SidebarProps {
-  isCollapsed: boolean;
-  onToggleCollapse: () => void;
-}
-
 export function Sidebar({ isCollapsed, onToggleCollapse }: SidebarProps) {
   const pathname = usePathname();
-  const currentRole = useProcurementStore((state) => state.currentRole);
-  const { currentUser, initials, roleLabel, handleLogout } = useCurrentUserProfile();
-  const navItems = currentRole === "Vendor" ? vendorNavItems : defaultNavItems;
+  const { currentUser, initials, roleLabel, handleLogout, currentRole } = useCurrentUserProfile();
+  const navItems = getNavItemsForRole(currentRole ?? "Requester");
+  const iconMap = {
+    home: Home,
+    layers: Layers,
+    truck: Truck,
+    "credit-card": CreditCard,
+    "bar-chart": BarChart3,
+    settings: Settings,
+    users: Users,
+  } as const;
 
   return (
     <aside
@@ -107,7 +102,7 @@ export function Sidebar({ isCollapsed, onToggleCollapse }: SidebarProps) {
               item.href.includes("?")
                 ? pathname === item.href.split("?")[0]
                 : pathname === item.href;
-            const Icon = item.icon;
+            const Icon = iconMap[item.icon];
 
             return (
               <Link

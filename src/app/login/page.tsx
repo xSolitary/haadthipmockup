@@ -4,6 +4,7 @@ import { startTransition, useState } from "react";
 import { Eye, EyeOff, LockKeyhole, Sparkles, UserCircle2, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { mockAccounts } from "@/lib/mock-auth";
+import { getDefaultRouteForRole } from "@/lib/route-access";
 import { useProcurementStore } from "@/store/useProcurementStore";
 
 export default function LoginPage() {
@@ -30,7 +31,7 @@ export default function LoginPage() {
 
     startTransition(() => {
       const nextRole = useProcurementStore.getState().currentRole;
-      router.replace(nextRole === "Vendor" ? "/my-requests?tab=po" : "/");
+      router.replace(getDefaultRouteForRole(nextRole));
     });
   };
 

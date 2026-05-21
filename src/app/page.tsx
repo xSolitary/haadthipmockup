@@ -69,6 +69,7 @@ function ActionCard({
 }
 
 export default function DashboardPage() {
+  const currentRole = useProcurementStore((state) => state.currentRole);
   const currentUserId = useProcurementStore((state) => state.currentUserId);
   const memos = useProcurementStore((state) => state.memos);
   const purchaseOrders = useProcurementStore((state) => state.purchaseOrders);
@@ -181,6 +182,20 @@ export default function DashboardPage() {
     const sourceMemo = memos.find((memo) => memo.id === po.memoId);
     return sourceMemo?.requesterId === currentUserId && ["Waiting for Purchasing to Propose Vendors", "Pending Vendor Approval"].includes(po.procurementStatus);
   }).length;
+  const actionCards =
+    currentRole === "Admin"
+      ? [
+          { href: "/reports", title: "รายงาน", value: prCount.toString(), icon: PackageSearch, muted: false },
+          { href: "/admin", title: "ตั้งค่าระบบ", value: "1", icon: Shapes, muted: false },
+          { href: "/admin/users", title: "จัดการผู้ใช้", value: String(memos.length > 0 ? 2 : 0), icon: TimerReset, muted: false },
+          { title: "สิทธิ์ระบบ", value: "Active", icon: TrendingUp, muted: true },
+        ]
+      : [
+          { href: "/my-requests", title: "Create Memo", value: memoActionCount.toString(), icon: FilePlus2, muted: false },
+          { href: "/my-requests", title: "รออนุมัติ", value: approvalsLeft.toString(), icon: TimerReset, muted: false },
+          { href: "/pr-po", title: "คัดเลือก Vendor", value: vendorSelectionsLeft.toString(), icon: PackageSearch, muted: false },
+          { title: "SAP (Mock)", value: "0", icon: Shapes, muted: true },
+        ];
 
   const topCategory = pieData[0] ?? null;
   const secondCategory = pieData[1] ?? null;
@@ -226,10 +241,16 @@ export default function DashboardPage() {
             </div>
 
             <div className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-              <ActionCard href="/my-requests" title="Create Memo" value={memoActionCount.toString()} icon={FilePlus2} />
-              <ActionCard href="/my-requests" title="รออนุมัติ" value={approvalsLeft.toString()} icon={TimerReset} />
-              <ActionCard href="/pr-po" title="คัดเลือก Vendor" value={vendorSelectionsLeft.toString()} icon={PackageSearch} />
-              <ActionCard title="SAP (Mock)" value="0" icon={Shapes} muted />
+              {actionCards.map((card) => (
+                <ActionCard
+                  key={card.title}
+                  href={card.href}
+                  title={card.title}
+                  value={card.value}
+                  icon={card.icon}
+                  muted={card.muted}
+                />
+              ))}
             </div>
           </section>
 

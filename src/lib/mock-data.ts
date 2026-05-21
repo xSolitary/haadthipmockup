@@ -30,7 +30,6 @@ export const roles: Role[] = [
   "Requester",
   "Approver",
   "Purchasing",
-  "Finance",
   "Vendor",
   "Admin",
 ];
@@ -56,13 +55,6 @@ export const users: User[] = [
     role: "Purchasing",
     department: "ฝ่ายจัดซื้อ",
     site: "Surat Thani Distribution Center",
-  },
-  {
-    id: "u4",
-    name: "นางสาวจารุวรรณ ไชยวงศ์",
-    role: "Finance",
-    department: "ฝ่ายบัญชี",
-    site: "Head Office",
   },
   {
     id: "u6",

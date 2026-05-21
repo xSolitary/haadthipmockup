@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { PageHeaderProvider } from "@/components/layout/PageHeaderContext";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { Topbar } from "@/components/layout/Topbar";
+import { canAccessPath, getDefaultRouteForRole } from "@/lib/route-access";
 import { loadFromStorage, saveToStorage } from "@/lib/storage";
 import { useProcurementStore } from "@/store/useProcurementStore";
 
@@ -53,9 +54,14 @@ export function AppShell({ children }: AppShellProps) {
     }
 
     if (isAuthenticated && isLoginRoute) {
-      router.replace(currentRole === "Vendor" ? "/my-requests?tab=po" : "/");
+      router.replace(getDefaultRouteForRole(currentRole));
+      return;
     }
-  }, [currentRole, hasHydrated, isAuthenticated, isLoginRoute, router]);
+
+    if (isAuthenticated && !isLoginRoute && !canAccessPath(currentRole, pathname)) {
+      router.replace(getDefaultRouteForRole(currentRole));
+    }
+  }, [currentRole, hasHydrated, isAuthenticated, isLoginRoute, pathname, router]);
 
   useEffect(() => {
     if (!hasHydrated || !isAuthenticated) {

@@ -5,15 +5,17 @@ import {
   BriefcaseBusiness,
   CheckCircle2,
   ShieldCheck,
+  ShieldUser,
   ShoppingCart,
   Store,
 } from "lucide-react";
+import { getDefaultRouteForRole } from "@/lib/route-access";
 import type { Role } from "@/lib/types";
 import { getRoleLabel } from "@/lib/ui-text";
 import { useProcurementStore } from "@/store/useProcurementStore";
 
 const roleCards: Array<{
-  role: Extract<Role, "Requester" | "Approver" | "Purchasing" | "Vendor">;
+  role: Extract<Role, "Requester" | "Approver" | "Purchasing" | "Vendor" | "Admin">;
   title: string;
   subtitle: string;
   icon: typeof BriefcaseBusiness;
@@ -42,15 +44,21 @@ const roleCards: Array<{
     subtitle: "ดู PO ที่ได้รับมอบหมายและอัปเดตสถานะการจัดส่ง",
     icon: Store,
   },
+  {
+    role: "Admin",
+    title: "ผู้ดูแลระบบ",
+    subtitle: "ดู Dashboard, Report, Setting และจัดการผู้ใช้งานกับสิทธิ์",
+    icon: ShieldUser,
+  },
 ];
 
 export function AuthGate() {
   const router = useRouter();
   const loginAsRole = useProcurementStore((state) => state.loginAsRole);
 
-  const handleSelectRole = (role: Extract<Role, "Requester" | "Approver" | "Purchasing" | "Vendor">) => {
+  const handleSelectRole = (role: Extract<Role, "Requester" | "Approver" | "Purchasing" | "Vendor" | "Admin">) => {
     loginAsRole(role);
-    router.replace(role === "Vendor" ? "/my-requests?tab=po" : "/");
+    router.replace(getDefaultRouteForRole(role));
   };
 
   return (
@@ -79,9 +87,9 @@ export function AuthGate() {
           </div>
         </div>
 
-        <div className="mt-8 grid gap-5 lg:grid-cols-4">
+        <div className="mt-8 grid gap-5 md:grid-cols-2 xl:grid-cols-5">
           {roleCards.map(({ role, title, subtitle, icon: Icon }, index) => {
-            const highlighted = index === 1;
+            const highlighted = index === 4;
 
             return (
               <button

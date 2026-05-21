@@ -3,7 +3,7 @@ import type { Role } from "@/lib/types";
 export interface MockAccount {
   username: string;
   password: string;
-  role: Extract<Role, "Requester" | "Approver" | "Purchasing" | "Finance" | "Vendor">;
+  role: Extract<Role, "Requester" | "Approver" | "Purchasing" | "Vendor" | "Admin">;
   labelTh: string;
   labelEn: string;
   name: string;
@@ -39,15 +39,6 @@ export const mockAccounts: MockAccount[] = [
     subtitle: "Procurement Team",
   },
   {
-    username: "finance",
-    password: "demo123",
-    role: "Finance",
-    labelTh: "การเงิน",
-    labelEn: "Finance",
-    name: "นางสาวจารุวรรณ ชัยวงศ์",
-    subtitle: "Finance",
-  },
-  {
     username: "vendor",
     password: "demo123",
     role: "Vendor",
@@ -55,6 +46,15 @@ export const mockAccounts: MockAccount[] = [
     labelEn: "Vendor",
     name: "บริษัท Vendor Demo จำกัด",
     subtitle: "ร้านค้า / Supplier",
+  },
+  {
+    username: "admin",
+    password: "demo123",
+    role: "Admin",
+    labelTh: "ผู้ดูแลระบบ",
+    labelEn: "Admin",
+    name: "นายธนากร บุญเกิด",
+    subtitle: "System Administrator",
   },
 ];
 
