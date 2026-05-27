@@ -154,6 +154,7 @@ export default function ReceivingPage() {
                   key={po.id}
                   type="button"
                   onClick={() => setSelectedPoId(po.id)}
+                  data-testid={`receiving-po-${po.id}`}
                   className={`w-full rounded-[20px] border px-4 py-4 text-left transition ${
                     selectedPoId === po.id
                       ? "border-[#007946]/25 bg-[#f0f9f6]"
@@ -208,11 +209,11 @@ export default function ReceivingPage() {
                   </div>
                   <div className="rounded-[20px] border border-slate-200 bg-slate-50 p-4">
                     <p className="text-xs text-slate-500">Tracking Number</p>
-                    <p className="mt-2 text-sm font-semibold text-slate-900">{selectedOrder.trackingNumber ?? "-"}</p>
+                    <p className="mt-2 break-all text-sm font-semibold text-slate-900">{selectedOrder.trackingNumber ?? "-"}</p>
                   </div>
                   <div className="rounded-[20px] border border-slate-200 bg-slate-50 p-4">
                     <p className="text-xs text-slate-500">กำหนดส่งถึง</p>
-                    <p className="mt-2 text-sm font-semibold text-slate-900">{selectedOrder.expectedDeliveryDate ?? "-"}</p>
+                    <p className="mt-2 break-words text-sm font-semibold text-slate-900">{selectedOrder.expectedDeliveryDate ?? "-"}</p>
                   </div>
                 </div>
 
@@ -236,7 +237,7 @@ export default function ReceivingPage() {
                 </div>
 
                 {selectedOrder.vendorDeliveryNote ? (
-                  <div className="mt-5 rounded-[20px] border border-slate-200 bg-[#f8fbf9] p-4 text-sm text-slate-600">
+                  <div className="mt-5 rounded-[20px] border border-slate-200 bg-[#f8fbf9] p-4 text-sm text-slate-600 break-words">
                     {selectedOrder.vendorDeliveryNote}
                   </div>
                 ) : null}
@@ -331,6 +332,7 @@ export default function ReceivingPage() {
                     <button
                       type="button"
                       onClick={() => setIsQcConfirmOpen(true)}
+                      data-testid="receive-goods-button"
                       disabled={!canReceive}
                       className="inline-flex h-10 items-center justify-center rounded-xl bg-[#007946] px-4 text-sm font-semibold text-white transition hover:bg-[#005f37] disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-500"
                     >
@@ -356,6 +358,7 @@ export default function ReceivingPage() {
                   onClick={() => {
                     void handleMarkQcPassed();
                   }}
+                  data-testid="mark-qc-passed-button"
                   className="inline-flex h-10 items-center rounded-xl bg-emerald-600 px-4 text-sm font-semibold text-white transition hover:bg-emerald-700"
                 >
                   ยืนยันผ่าน QC

@@ -1347,6 +1347,7 @@ export async function receivePurchaseOrder(
   await prisma.$transaction(async (tx) => {
     const po = assertFound(await tx.purchaseOrder.findUnique({ where: { id: poId } }), "Purchase order not found");
     assertTransition(
+      po.procurementStatus === PrismaProcurementStatus.POCreated ||
       po.procurementStatus === PrismaProcurementStatus.SentToVendor ||
         po.procurementStatus === PrismaProcurementStatus.PendingReceiving ||
         po.procurementStatus === PrismaProcurementStatus.Received,

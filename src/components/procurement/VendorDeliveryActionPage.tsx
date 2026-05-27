@@ -48,15 +48,28 @@ export function VendorDeliveryActionPage({ poId }: { poId: string }) {
   );
   const [note, setNote] = useState(purchaseOrder?.vendorDeliveryNote ?? "");
   const [successOpen, setSuccessOpen] = useState(false);
+  const [formError, setFormError] = useState("");
 
   const canAccess = currentRole === "Vendor" && Boolean(purchaseOrder?.selectedVendorName);
+  const isDeliveryLocked = Boolean(
+    purchaseOrder &&
+      ["QC Passed", "Payment Pending", "Closed"].includes(purchaseOrder.procurementStatus),
+  );
+  const [isLockedModalOpen, setIsLockedModalOpen] = useState(canAccess && isDeliveryLocked);
+  const canEditDelivery = canAccess && !isDeliveryLocked;
 
   const handleSave = () => {
-    if (!purchaseOrder) {
+    if (!purchaseOrder || !canEditDelivery) {
+      return;
+    }
+
+    if (expectedDeliveryDate && expectedDeliveryDate < new Date().toISOString().slice(0, 10)) {
+      setFormError("วันที่จัดส่งต้องไม่ย้อนหลัง โปรดเลือกวันที่ใหม่");
       return;
     }
 
     const now = new Date().toISOString();
+    setFormError("");
     updateVendorDelivery(purchaseOrder.id, {
       vendorDeliveryStatus: status,
       vendorDeliveryNote: note.trim() || undefined,
@@ -99,6 +112,17 @@ export function VendorDeliveryActionPage({ poId }: { poId: string }) {
         subtitle="ร้านค้าสามารถอัปเดตความคืบหน้าการจัดส่งให้ผู้อนุมัติและฝ่ายจัดซื้อเห็นได้ทันที"
         badge="งานจัดส่ง"
       />
+
+      {formError ? (
+        <div className="rounded-[24px] border border-rose-200 bg-rose-50 px-5 py-4 text-sm text-rose-700">
+          {formError}
+        </div>
+      ) : null}
+      {isDeliveryLocked ? (
+        <div className="rounded-[24px] border border-amber-200 bg-amber-50 px-5 py-4 text-sm text-amber-900">
+          PO นี้ผ่านขั้นตอน QC แล้ว จึงไม่สามารถแก้ไขสถานะจัดส่งได้
+        </div>
+      ) : null}
 
       <div className="grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
         <section className="space-y-6 rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm shadow-slate-200/50">
@@ -180,12 +204,17 @@ export function VendorDeliveryActionPage({ poId }: { poId: string }) {
                   <button
                     key={option}
                     type="button"
-                    onClick={() => setStatus(option)}
+                    onClick={() => {
+                      if (!canEditDelivery) return;
+                      setStatus(option);
+                    }}
+                    data-testid={`delivery-status-${option}`}
+                    disabled={!canEditDelivery}
                     className={`flex w-full items-center justify-between rounded-[20px] border px-4 py-3 text-left transition ${
                       active
                         ? "border-[#007946] bg-[#eef8f2] text-[#0d5738]"
                         : "border-slate-200 bg-white text-slate-600 hover:border-[#007946]/25 hover:bg-[#f7fbf8]"
-                    }`}
+                    } disabled:cursor-not-allowed disabled:opacity-60`}
                   >
                     <span className="font-medium">{option}</span>
                     {active ? <span className="rounded-full bg-[#007946] px-2 py-1 text-xs font-semibold text-white">ปัจจุบัน</span> : null}
@@ -200,6 +229,7 @@ export function VendorDeliveryActionPage({ poId }: { poId: string }) {
             <input
               value={trackingNumber}
               onChange={(event) => setTrackingNumber(event.target.value)}
+              disabled={!canEditDelivery}
               placeholder="ระบุเลขติดตามพัสดุ (ถ้ามี)"
               className="h-11 w-full rounded-xl border border-slate-200 bg-white px-4 text-sm text-slate-900"
             />
@@ -211,6 +241,7 @@ export function VendorDeliveryActionPage({ poId }: { poId: string }) {
               type="date"
               value={expectedDeliveryDate}
               onChange={(event) => setExpectedDeliveryDate(event.target.value)}
+              disabled={!canEditDelivery}
               className="h-11 w-full rounded-xl border border-slate-200 bg-white px-4 text-sm text-slate-900"
             />
           </label>
@@ -220,6 +251,7 @@ export function VendorDeliveryActionPage({ poId }: { poId: string }) {
             <textarea
               value={note}
               onChange={(event) => setNote(event.target.value)}
+              disabled={!canEditDelivery}
               rows={5}
               placeholder="ระบุรายละเอียดเพิ่มเติมสำหรับฝ่ายจัดซื้อหรือผู้อนุมัติ"
               className="w-full rounded-[20px] border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900"
@@ -229,7 +261,9 @@ export function VendorDeliveryActionPage({ poId }: { poId: string }) {
           <button
             type="button"
             onClick={handleSave}
-            className="inline-flex h-11 w-full items-center justify-center rounded-[18px] bg-[#007946] px-4 text-sm font-semibold text-white shadow-[0_14px_24px_rgba(0,121,70,0.22)] transition hover:bg-[#005f37]"
+            data-testid="save-delivery-status-button"
+            disabled={!canEditDelivery}
+            className="inline-flex h-11 w-full items-center justify-center rounded-[18px] bg-[#007946] px-4 text-sm font-semibold text-white shadow-[0_14px_24px_rgba(0,121,70,0.22)] transition hover:bg-[#005f37] disabled:cursor-not-allowed disabled:bg-slate-300 disabled:shadow-none"
           >
             บันทึกสถานะ
           </button>
@@ -244,6 +278,12 @@ export function VendorDeliveryActionPage({ poId }: { poId: string }) {
           setSuccessOpen(false);
           router.push(`/my-requests?tab=po&highlightId=${poId}`);
         }}
+      />
+      <SuccessModal
+        open={isLockedModalOpen}
+        title="สถานะจัดส่งถูกล็อก"
+        description="PO นี้ผ่านขั้นตอน QC แล้ว จึงไม่สามารถแก้ไขสถานะจัดส่งได้"
+        onClose={() => setIsLockedModalOpen(false)}
       />
     </div>
   );

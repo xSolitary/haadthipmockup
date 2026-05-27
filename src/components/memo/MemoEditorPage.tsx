@@ -53,6 +53,10 @@ function clampNumber(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), max);
 }
 
+function roundCurrency(value: number) {
+  return Math.round((value + Number.EPSILON) * 100) / 100;
+}
+
 function getErrorMessage(error: unknown) {
   return error instanceof Error ? error.message : "ข้อมูลไม่ถูกต้อง โปรดใส่ใหม่";
 }
@@ -177,6 +181,7 @@ export function MemoEditorPage({ memoId }: { memoId?: string }) {
   const shouldShowEditor = !isEditing || Boolean(editingMemo) && (canEdit || successModal.open || isCompletingResubmit);
 
   const total = useMemo(() => items.reduce((sum, item) => sum + item.quantity * item.unitPrice, 0), [items]);
+  const totalExceedsMemoLimit = total > PROCUREMENT_LIMITS.memoEstimatedTotalMax;
 
   const latestRevisionReason = editingMemo?.history
     .slice()
@@ -197,9 +202,9 @@ export function MemoEditorPage({ memoId }: { memoId?: string }) {
               ...item,
               [field]:
                 field === "quantity"
-                  ? clampNumber(Number(value), 1, PROCUREMENT_LIMITS.itemQuantityMax)
+                  ? Math.trunc(clampNumber(Number(value), 1, PROCUREMENT_LIMITS.itemQuantityMax))
                   : field === "unitPrice"
-                    ? clampNumber(Number(value), 0, PROCUREMENT_LIMITS.unitPriceMax)
+                    ? roundCurrency(clampNumber(Number(value), 0, PROCUREMENT_LIMITS.unitPriceMax))
                     : value,
             }
           : item,
@@ -507,6 +512,7 @@ export function MemoEditorPage({ memoId }: { memoId?: string }) {
                       <input
                         type="number"
                         min={1}
+                        step={1}
                         max={PROCUREMENT_LIMITS.itemQuantityMax}
                         value={item.quantity}
                         onChange={(event) => handleItemChange(item.id, "quantity", Number(event.target.value))}
@@ -517,7 +523,8 @@ export function MemoEditorPage({ memoId }: { memoId?: string }) {
                       ราคา / หน่วย
                       <input
                         type="number"
-                        min={0}
+                        min={0.01}
+                        step={0.01}
                         max={PROCUREMENT_LIMITS.unitPriceMax}
                         value={item.unitPrice}
                         onChange={(event) => handleItemChange(item.id, "unitPrice", Number(event.target.value))}
@@ -576,6 +583,11 @@ export function MemoEditorPage({ memoId }: { memoId?: string }) {
               <div className="rounded-[20px] border border-slate-200 bg-slate-50 p-4">
                 <p className="text-slate-500">มูลค่ารวมประมาณการ</p>
                 <p className="mt-2 text-2xl font-semibold text-slate-900">{formatCurrency(total)}</p>
+                {totalExceedsMemoLimit ? (
+                  <p className="mt-2 text-sm font-medium text-rose-600">
+                    มูลค่ารวมต้องไม่เกิน {formatCurrency(PROCUREMENT_LIMITS.memoEstimatedTotalMax)}
+                  </p>
+                ) : null}
               </div>
               <div className="rounded-[20px] border border-slate-200 bg-slate-50 p-4">
                 <p className="text-slate-500">Status ปัจจุบัน</p>
@@ -611,6 +623,7 @@ export function MemoEditorPage({ memoId }: { memoId?: string }) {
                 <button
                   type="button"
                   onClick={fillDemoData}
+                  data-testid="memo-autofill-button"
                   disabled={isSubmitting}
                   className="h-10 w-full rounded-xl border border-[#007946]/20 bg-[#f0f9f6] px-4 text-sm font-semibold text-[#007946] transition hover:bg-[#e6f5ee] disabled:cursor-not-allowed disabled:opacity-60"
                 >
@@ -620,6 +633,7 @@ export function MemoEditorPage({ memoId }: { memoId?: string }) {
               <button
                 type="button"
                 onClick={handleSubmitClick}
+                data-testid="memo-submit-button"
                 disabled={isSubmitting}
                 className="h-10 w-full rounded-xl bg-[#007946] px-4 text-sm font-semibold text-white transition hover:bg-[#005f37] disabled:cursor-not-allowed disabled:opacity-60"
               >

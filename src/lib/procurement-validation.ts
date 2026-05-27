@@ -12,6 +12,7 @@ export const PROCUREMENT_LIMITS = {
   itemsPerMemo: 100,
   itemQuantityMax: 1_000_000,
   unitPriceMax: 10_000_000,
+  memoEstimatedTotalMax: 1_000_000,
   budgetAmountMax: 1_000_000_000,
   textShortMax: 120,
   textMediumMax: 255,
@@ -67,6 +68,16 @@ function failValidation(message: string): never {
 
 function formatCurrencyAmount(value: number) {
   return new Intl.NumberFormat("th-TH").format(value);
+}
+
+function roundCurrency(value: number) {
+  return Math.round((value + Number.EPSILON) * 100) / 100;
+}
+
+function addOneYear(dateString: string) {
+  const parsed = new Date(`${dateString}T00:00:00.000Z`);
+  parsed.setUTCFullYear(parsed.getUTCFullYear() + 1);
+  return parsed.toISOString().slice(0, 10);
 }
 
 function getFieldLabel(field: string) {
@@ -167,15 +178,20 @@ function assertFiniteNumber(
     failValidation(createRetryMessage(field));
   }
 
+  const normalizedValue =
+    field.includes("unitPrice") || field === "quotedPrice" || field === "poAmount"
+      ? roundCurrency(value)
+      : value;
+
   if (value > PROCUREMENT_LIMITS.unitPriceMax && (field.includes("unitPrice") || field === "quotedPrice")) {
     failValidation(`ราคาเกิน ${formatCurrencyAmount(PROCUREMENT_LIMITS.unitPriceMax)} บาท โปรดใส่ใหม่`);
   }
 
-  if (value < min || value > max) {
+  if (normalizedValue < min || normalizedValue > max) {
     failValidation(createRetryMessage(field));
   }
 
-  return value;
+  return normalizedValue;
 }
 
 function assertBoolean(value: unknown, field: string, options: { optional?: boolean } = {}) {
@@ -253,9 +269,12 @@ function validateMemoItems(items: unknown): MemoItem[] {
     const quantity = assertFiniteNumber(
       typedItem.quantity,
       `items[${index}].quantity`,
-      0.0001,
+      1,
       PROCUREMENT_LIMITS.itemQuantityMax,
     );
+    if (!Number.isInteger(quantity)) {
+      failValidation("จำนวนต้องเป็นจำนวนเต็ม โปรดใส่ใหม่");
+    }
     const unit = assertNonEmptyString(
       typedItem.unit,
       `items[${index}].unit`,
@@ -264,7 +283,7 @@ function validateMemoItems(items: unknown): MemoItem[] {
     const unitPrice = assertFiniteNumber(
       typedItem.unitPrice,
       `items[${index}].unitPrice`,
-      0,
+      0.01,
       PROCUREMENT_LIMITS.unitPriceMax,
     );
     const category = assertEnumValue(
@@ -341,6 +360,14 @@ export function validateMemoPayload(
 
   if (validated.requestDate && validated.requiredDate && validated.requiredDate < validated.requestDate) {
     failValidation("วันที่ต้องการใช้ต้องไม่น้อยกว่าวันที่ขอ โปรดใส่ใหม่");
+  }
+
+  if (
+    validated.requestDate &&
+    validated.requiredDate &&
+    validated.requiredDate > addOneYear(validated.requestDate)
+  ) {
+    failValidation("วันที่ต้องการใช้ต้องไม่เกิน 1 ปีนับจากวันที่ขอ โปรดใส่ใหม่");
   }
 
   if (!partial || payload.title !== undefined) {
@@ -427,6 +454,12 @@ export function validateMemoPayload(
       0,
     );
 
+    if (estimatedTotal > PROCUREMENT_LIMITS.memoEstimatedTotalMax) {
+      failValidation(
+        `มูลค่ารวมต้องไม่เกิน ${formatCurrencyAmount(PROCUREMENT_LIMITS.memoEstimatedTotalMax)} บาท โปรดใส่ใหม่`,
+      );
+    }
+
     if (estimatedTotal > PROCUREMENT_LIMITS.budgetAmountMax) {
       failValidation(
         `มูลค่ารวมเกิน ${formatCurrencyAmount(PROCUREMENT_LIMITS.budgetAmountMax)} บาท โปรดใส่ใหม่`,
@@ -456,7 +489,7 @@ export function validateVendorProposalPayload(
     validated.quotedPrice = assertFiniteNumber(
       payload.quotedPrice,
       "quotedPrice",
-      0,
+      0.01,
       PROCUREMENT_LIMITS.budgetAmountMax,
     );
   }
@@ -467,6 +500,10 @@ export function validateVendorProposalPayload(
       "leadTime",
       PROCUREMENT_LIMITS.textShortMax,
     );
+
+    if (validated.leadTime && /^-\d/.test(validated.leadTime.trim())) {
+      failValidation("Lead time ต้องไม่ติดลบ โปรดใส่ใหม่");
+    }
   }
 
   if (!partial || payload.paymentTerms !== undefined) {

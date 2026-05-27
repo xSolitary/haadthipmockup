@@ -26,6 +26,10 @@ function clampNumber(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), max);
 }
 
+function roundCurrency(value: number) {
+  return Math.round((value + Number.EPSILON) * 100) / 100;
+}
+
 function getErrorMessage(error: unknown) {
   return error instanceof Error ? error.message : "ข้อมูลไม่ถูกต้อง โปรดใส่ใหม่";
 }
@@ -93,6 +97,8 @@ export function VendorProposalActionPage({ poId }: { poId: string }) {
   );
 
   const canPurchasingAct = currentRole === "Purchasing" && Boolean(purchaseOrder);
+  const isPurchasingStage = purchaseOrder?.procurementStatus === "Waiting for Purchasing to Propose Vendors";
+  const canPurchasingEdit = canPurchasingAct && isPurchasingStage;
   const canApproverAct =
     currentRole === "Approver" &&
     Boolean(purchaseOrder) &&
@@ -121,6 +127,7 @@ export function VendorProposalActionPage({ poId }: { poId: string }) {
   });
   const [isSubmitConfirmOpen, setIsSubmitConfirmOpen] = useState(false);
   const [isAutoFilling, setIsAutoFilling] = useState(false);
+  const [isStageBlockedModalOpen, setIsStageBlockedModalOpen] = useState(canPurchasingAct && !isPurchasingStage);
   const [formError, setFormError] = useState("");
 
   const submittedProposals = useMemo(
@@ -134,13 +141,13 @@ export function VendorProposalActionPage({ poId }: { poId: string }) {
   };
 
   const handleSaveProposal = async () => {
-    if (!purchaseOrder || !proposalForm.vendorName.trim()) return;
+    if (!purchaseOrder || !canPurchasingEdit || !proposalForm.vendorName.trim()) return;
 
     setFormError("");
     const payload = {
       vendorId: null,
       vendorName: proposalForm.vendorName.trim(),
-      quotedPrice: Number(proposalForm.quotedPrice || 0),
+      quotedPrice: roundCurrency(Number(proposalForm.quotedPrice || 0)),
       leadTime: proposalForm.leadTime.trim() || "-",
       paymentTerms: proposalForm.paymentTerms.trim() || "-",
       notes: proposalForm.notes.trim() || "-",
@@ -163,7 +170,7 @@ export function VendorProposalActionPage({ poId }: { poId: string }) {
   };
 
   const handleAutoFill = async () => {
-    if (!purchaseOrder || isAutoFilling) return;
+    if (!purchaseOrder || !canPurchasingEdit || isAutoFilling) return;
 
     setIsAutoFilling(true);
     setFormError("");
@@ -199,6 +206,8 @@ export function VendorProposalActionPage({ poId }: { poId: string }) {
   };
 
   const handleEditProposal = (proposalId: string) => {
+    if (!canPurchasingEdit) return;
+
     const proposal = purchaseOrder?.vendorProposals.find((item) => item.id === proposalId);
     if (!proposal) return;
 
@@ -215,6 +224,8 @@ export function VendorProposalActionPage({ poId }: { poId: string }) {
   };
 
   const toggleSelectedProposal = (proposalId: string) => {
+    if (!canPurchasingEdit) return;
+
     setSelectedProposalIds((current) =>
       current.includes(proposalId)
         ? current.filter((id) => id !== proposalId)
@@ -223,7 +234,7 @@ export function VendorProposalActionPage({ poId }: { poId: string }) {
   };
 
   const handleConfirmSelected = async () => {
-    if (!purchaseOrder || selectedProposalIds.length === 0) return;
+    if (!purchaseOrder || !canPurchasingEdit || selectedProposalIds.length === 0) return;
     await submitVendorProposals(purchaseOrder.id, selectedProposalIds);
     setIsSubmitConfirmOpen(false);
     setSuccessModal({
@@ -282,6 +293,11 @@ export function VendorProposalActionPage({ poId }: { poId: string }) {
               {formError}
             </div>
           ) : null}
+          {canPurchasingAct && !canPurchasingEdit ? (
+            <div className="rounded-[24px] border border-amber-200 bg-amber-50 px-5 py-4 text-sm text-amber-900">
+              Vendor proposals can only be submitted from the purchasing stage และไม่สามารถแก้ไขรายการนี้ได้ในสถานะปัจจุบัน
+            </div>
+          ) : null}
           <FormSection title="สรุป PR" description="รายละเอียดคำขอที่อยู่ในขั้นตอนคัดเลือก Vendor">
             <div className="grid gap-4 md:grid-cols-2">
               <div className="rounded-[20px] border border-slate-200 bg-slate-50 p-4">
@@ -303,7 +319,7 @@ export function VendorProposalActionPage({ poId }: { poId: string }) {
             </div>
           </FormSection>
 
-          {canPurchasingAct ? (
+          {canPurchasingEdit ? (
             <FormSection
               title="ฟอร์ม Vendor Proposal"
               description="เพิ่มหรือแก้ไขตัวเลือก Vendor ก่อนส่งให้ผู้อนุมัติ"
@@ -319,14 +335,15 @@ export function VendorProposalActionPage({ poId }: { poId: string }) {
                 />
                 <input
                   type="number"
-                  min={0}
+                  min={0.01}
+                  step={0.01}
                   max={PROCUREMENT_LIMITS.budgetAmountMax}
                   value={proposalForm.quotedPrice}
                   onChange={(event) =>
                     setProposalForm((current) => ({
                       ...current,
                       quotedPrice: String(
-                        clampNumber(Number(event.target.value), 0, PROCUREMENT_LIMITS.budgetAmountMax),
+                        roundCurrency(clampNumber(Number(event.target.value), 0, PROCUREMENT_LIMITS.budgetAmountMax)),
                       ),
                     }))
                   }
@@ -387,6 +404,7 @@ export function VendorProposalActionPage({ poId }: { poId: string }) {
                 <button
                   type="button"
                   onClick={handleAutoFill}
+                  data-testid="vendor-proposal-autofill-button"
                   disabled={isAutoFilling}
                   className="inline-flex h-10 items-center rounded-xl border border-[#007946]/20 bg-[#f0f9f6] px-4 text-sm font-semibold text-[#007946] transition hover:bg-[#e6f5ee] disabled:cursor-not-allowed disabled:opacity-60"
                 >
@@ -420,13 +438,18 @@ export function VendorProposalActionPage({ poId }: { poId: string }) {
                 </p>
               ) : (
                 (canPurchasingAct ? purchaseOrder.vendorProposals : submittedProposals).map((proposal) => (
-                  <div key={proposal.id} className="rounded-[20px] border border-slate-200 bg-slate-50 p-4">
+                  <div
+                    key={proposal.id}
+                    data-testid={`vendor-proposal-card-${proposal.id}`}
+                    className="rounded-[20px] border border-slate-200 bg-slate-50 p-4"
+                  >
                     <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                       <div className="flex-1">
-                        {canPurchasingAct ? (
+                        {canPurchasingEdit ? (
                           <label className="inline-flex items-center gap-3 text-sm font-medium text-slate-700">
                             <input
                               type="checkbox"
+                              data-testid={`vendor-proposal-checkbox-${proposal.id}`}
                               checked={selectedProposalIds.includes(proposal.id)}
                               onChange={() => toggleSelectedProposal(proposal.id)}
                               className="h-4 w-4 rounded border-slate-300 text-[#007946]"
@@ -450,7 +473,7 @@ export function VendorProposalActionPage({ poId }: { poId: string }) {
                         <p className="text-xl font-semibold text-slate-900">
                           {formatCurrency(proposal.quotedPrice)}
                         </p>
-                        {canPurchasingAct ? (
+                        {canPurchasingEdit ? (
                           <div className="flex gap-2">
                             <button
                               type="button"
@@ -476,6 +499,7 @@ export function VendorProposalActionPage({ poId }: { poId: string }) {
                           <button
                             type="button"
                             onClick={() => setConfirmingProposalId(proposal.id)}
+                            data-testid={`vendor-approve-button-${proposal.id}`}
                             className="inline-flex h-10 items-center rounded-xl bg-[#007946] px-4 text-sm font-semibold text-white transition hover:bg-[#005f37]"
                           >
                             ยืนยัน Vendor
@@ -522,7 +546,8 @@ export function VendorProposalActionPage({ poId }: { poId: string }) {
               <button
                 type="button"
                 onClick={() => setIsSubmitConfirmOpen(true)}
-                disabled={selectedProposalIds.length === 0}
+                data-testid="submit-selected-vendors-button"
+                disabled={!canPurchasingEdit || selectedProposalIds.length === 0}
                 className="mt-4 inline-flex h-10 w-full items-center justify-center rounded-xl bg-[#007946] px-4 text-sm font-semibold text-white transition hover:bg-[#005f37] disabled:cursor-not-allowed disabled:bg-slate-300"
               >
                 ยืนยัน Vendor ที่เลือก
@@ -573,6 +598,15 @@ export function VendorProposalActionPage({ poId }: { poId: string }) {
         onConfirm={() => {
           void handleConfirmSelected();
         }}
+      />
+      <ConfirmModal
+        open={isStageBlockedModalOpen}
+        title="Vendor Proposal ถูกล็อกชั่วคราว"
+        description="Vendor proposals can only be submitted from the purchasing stage และไม่สามารถแก้ไขรายการนี้ได้ในสถานะปัจจุบัน"
+        confirmLabel="รับทราบ"
+        cancelLabel="กลับ"
+        onCancel={() => setIsStageBlockedModalOpen(false)}
+        onConfirm={() => setIsStageBlockedModalOpen(false)}
       />
       <ConfirmModal
         open={Boolean(confirmingProposalId)}

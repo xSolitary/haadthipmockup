@@ -9,6 +9,16 @@ import { DataTable } from "@/components/ui/DataTable";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { downloadPoPdf, downloadPrPdf } from "@/lib/pdf";
+import {
+  filterMemoRequests,
+  filterPoItems,
+  filterPrItems,
+  getPoDisplayStatus,
+  sortMemoRequests,
+  sortPoItems,
+  sortPrItems,
+  type ProcureToPaySortOption,
+} from "@/lib/procure-to-pay";
 import type { MemoRequest, PurchaseOrder } from "@/lib/types";
 import { getCategoryLabel, getStatusLabel } from "@/lib/ui-text";
 import {
@@ -28,7 +38,7 @@ type PreviewState =
   | { type: "pr"; id: string }
   | { type: "po"; id: string }
   | null;
-type SortOption = "latest" | "oldest" | "document" | "status" | "amount-desc" | "amount-asc";
+type SortOption = ProcureToPaySortOption;
 type PoDeliveryFilter =
   | "all"
   | "รับคำสั่งซื้อแล้ว"
@@ -71,44 +81,15 @@ const sortOptions: Array<{ value: SortOption; label: string }> = [
   { value: "amount-asc", label: "ยอดเงินน้อยไปมาก" },
 ];
 
-function getPoDisplayStatus(po: PurchaseOrder) {
-  if (po.vendorDeliveryStatus) {
-    return po.vendorDeliveryStatus;
-  }
-
-  if (po.procurementStatus === "Pending Receiving") {
-    return "รอรับสินค้า";
-  }
-
-  if (po.procurementStatus === "QC Passed") {
-    return "ผ่าน QC";
-  }
-
-  return null;
-}
-
-function compareText(a: string, b: string) {
-  return a.localeCompare(b, "th");
-}
-
-function compareDate(a?: string, b?: string, direction: "asc" | "desc" = "desc") {
-  const left = a ? new Date(a).getTime() : 0;
-  const right = b ? new Date(b).getTime() : 0;
-
-  return direction === "asc" ? left - right : right - left;
-}
-
-function getPoTimestamp(po: PurchaseOrder) {
-  return po.vendorUpdatedAt ?? po.updatedAt;
-}
-
 function SummaryTabCard({
+  tabId,
   active,
   label,
   count,
   pendingCount,
   onClick,
 }: {
+  tabId: ProcureTab;
   active: boolean;
   label: string;
   count: number;
@@ -119,6 +100,7 @@ function SummaryTabCard({
     <button
       type="button"
       onClick={onClick}
+      data-testid={`procure-tab-${tabId}`}
       className={`relative flex min-h-[88px] w-full items-start justify-between overflow-hidden rounded-[24px] border px-5 py-4 text-left transition ${
         active
           ? "border-[#007946]/20 bg-[var(--surface-tint)] shadow-[var(--shadow-sm)]"
@@ -176,16 +158,28 @@ function InfoCard({ label, value }: { label: string; value: ReactNode }) {
   return (
     <div className={`${dashboardInnerCardClass} p-4`}>
       <p className="text-xs text-slate-500">{label}</p>
-      <div className="mt-1.5 font-semibold text-slate-900">{value}</div>
+      <div className="mt-1.5 min-w-0 break-words font-semibold text-slate-900">{value}</div>
     </div>
   );
 }
 
-function ActionIconLink({ href, icon, title }: { href: string; icon: ReactNode; title: string }) {
+function ActionIconLink({
+  href,
+  icon,
+  title,
+  testId,
+}: {
+  href: string;
+  icon: ReactNode;
+  title: string;
+  testId?: string;
+}) {
   return (
     <Link
       href={href}
       title={title}
+      aria-label={title}
+      data-testid={testId}
       className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-[var(--border)] bg-[var(--surface)] text-slate-600 shadow-[var(--shadow-sm)] transition hover:border-[#007946]/25 hover:bg-[var(--surface-tint)] hover:text-[#007946]"
     >
       {icon}
@@ -193,12 +187,24 @@ function ActionIconLink({ href, icon, title }: { href: string; icon: ReactNode; 
   );
 }
 
-function ActionIconButton({ onClick, icon, title }: { onClick: () => void; icon: ReactNode; title: string }) {
+function ActionIconButton({
+  onClick,
+  icon,
+  title,
+  testId,
+}: {
+  onClick: () => void;
+  icon: ReactNode;
+  title: string;
+  testId?: string;
+}) {
   return (
     <button
       type="button"
       onClick={onClick}
       title={title}
+      aria-label={title}
+      data-testid={testId}
       className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-[var(--border)] bg-[var(--surface)] text-slate-600 shadow-[var(--shadow-sm)] transition hover:border-[#007946]/25 hover:bg-[var(--surface-tint)] hover:text-[#007946]"
     >
       {icon}
@@ -435,41 +441,6 @@ function PoDocumentPreview({ purchaseOrder, memo }: { purchaseOrder: PurchaseOrd
   );
 }
 
-function matchesMemoSearch(memo: MemoRequest, searchTerm: string) {
-  if (!searchTerm) return true;
-  const query = searchTerm.toLowerCase();
-  return [
-    memo.documentNumber,
-    memo.title,
-    memo.site,
-    memo.department,
-    memo.status,
-    memo.procurementStatus,
-  ]
-    .join(" ")
-    .toLowerCase()
-    .includes(query);
-}
-
-function matchesPoSearch(po: PurchaseOrder, searchTerm: string) {
-  if (!searchTerm) return true;
-  const query = searchTerm.toLowerCase();
-  return [
-    po.documentNumber,
-    po.prNumber ?? "",
-    po.poNumber ?? "",
-    po.memoTitle,
-    po.selectedVendorName ?? "",
-    po.vendorName,
-    po.procurementStatus,
-    po.vendorDeliveryStatus ?? "",
-    po.trackingNumber ?? "",
-  ]
-    .join(" ")
-    .toLowerCase()
-    .includes(query);
-}
-
 export function ProcureToPayPage({
   initialTab = "memo",
   initialHighlightId = null,
@@ -615,100 +586,32 @@ export function ProcureToPayPage({
   }, [initialHighlightId, pathname]);
 
   const filteredMemoRequests = useMemo(
-    () =>
-      memoRequests.filter(
-        (memo) => matchesMemoSearch(memo, searchTerm) && (statusFilter === "all" || memo.status === statusFilter),
-      ),
+    () => filterMemoRequests(memoRequests, searchTerm, statusFilter),
     [memoRequests, searchTerm, statusFilter],
   );
 
   const filteredPrItems = useMemo(
-    () =>
-      prItems.filter(
-        (po) => matchesPoSearch(po, searchTerm) && (statusFilter === "all" || po.procurementStatus === statusFilter),
-      ),
+    () => filterPrItems(prItems, searchTerm, statusFilter),
     [prItems, searchTerm, statusFilter],
   );
 
   const filteredPoItems = useMemo(
-    () =>
-      poItems.filter(
-        (po) =>
-          matchesPoSearch(po, searchTerm) &&
-          (statusFilter === "all" || getPoDisplayStatus(po) === statusFilter || po.procurementStatus === statusFilter),
-      ),
+    () => filterPoItems(poItems, searchTerm, statusFilter),
     [poItems, searchTerm, statusFilter],
   );
 
   const sortedMemoRequests = useMemo(
-    () =>
-      [...filteredMemoRequests].sort((a, b) => {
-        switch (sortOption) {
-          case "oldest":
-            return compareDate(a.updatedAt, b.updatedAt, "asc");
-          case "document":
-            return compareText(a.documentNumber, b.documentNumber);
-          case "status":
-            return compareText(getStatusLabel(a.status), getStatusLabel(b.status));
-          case "amount-desc":
-            return b.estimatedTotal - a.estimatedTotal;
-          case "amount-asc":
-            return a.estimatedTotal - b.estimatedTotal;
-          case "latest":
-          default:
-            return compareDate(a.updatedAt, b.updatedAt, "desc");
-        }
-      }),
+    () => sortMemoRequests(filteredMemoRequests, sortOption),
     [filteredMemoRequests, sortOption],
   );
 
   const sortedPrItems = useMemo(
-    () =>
-      [...filteredPrItems].sort((a, b) => {
-        const leftAmount = memoById.get(a.memoId)?.estimatedTotal ?? a.amount;
-        const rightAmount = memoById.get(b.memoId)?.estimatedTotal ?? b.amount;
-
-        switch (sortOption) {
-          case "oldest":
-            return compareDate(a.updatedAt, b.updatedAt, "asc");
-          case "document":
-            return compareText(a.prNumber ?? a.documentNumber, b.prNumber ?? b.documentNumber);
-          case "status":
-            return compareText(getStatusLabel(a.procurementStatus), getStatusLabel(b.procurementStatus));
-          case "amount-desc":
-            return rightAmount - leftAmount;
-          case "amount-asc":
-            return leftAmount - rightAmount;
-          case "latest":
-          default:
-            return compareDate(a.updatedAt, b.updatedAt, "desc");
-        }
-      }),
+    () => sortPrItems(filteredPrItems, memoById, sortOption),
     [filteredPrItems, memoById, sortOption],
   );
 
   const sortedPoItems = useMemo(
-    () =>
-      [...filteredPoItems].sort((a, b) => {
-        switch (sortOption) {
-          case "oldest":
-            return compareDate(getPoTimestamp(a), getPoTimestamp(b), "asc");
-          case "document":
-            return compareText(a.poNumber ?? a.documentNumber, b.poNumber ?? b.documentNumber);
-          case "status":
-            return compareText(
-              getStatusLabel(getPoDisplayStatus(a) ?? a.procurementStatus),
-              getStatusLabel(getPoDisplayStatus(b) ?? b.procurementStatus),
-            );
-          case "amount-desc":
-            return b.amount - a.amount;
-          case "amount-asc":
-            return a.amount - b.amount;
-          case "latest":
-          default:
-            return compareDate(getPoTimestamp(a), getPoTimestamp(b), "desc");
-        }
-      }),
+    () => sortPoItems(filteredPoItems, sortOption),
     [filteredPoItems, sortOption],
   );
 
@@ -816,6 +719,7 @@ export function ProcureToPayPage({
           {visibleTabs.map((tab) => (
             <SummaryTabCard
               key={tab.id}
+              tabId={tab.id}
               active={currentTab === tab.id}
               label={tab.label}
               count={tab.count}
@@ -866,6 +770,7 @@ export function ProcureToPayPage({
           {canCreateMemo ? (
             <Link
               href="/memo/create"
+              data-testid="create-memo-link"
               className="inline-flex h-11 items-center justify-center gap-2 rounded-[18px] bg-[#007946] px-4 text-sm font-semibold text-white shadow-sm shadow-emerald-900/10 transition hover:bg-[#00643a]"
             >
               <Plus className="h-4 w-4" /> Create Memo
@@ -895,6 +800,7 @@ export function ProcureToPayPage({
                 {sortedMemoRequests.map((memo) => (
                   <tr
                     key={memo.id}
+                    data-testid={`memo-row-${memo.id}`}
                     className={`border-t border-slate-100 transition hover:bg-[#fafdfb] ${highlightedId === memo.id ? "soft-highlight" : ""}`}
                   >
                     <td className="px-4 text-slate-700">{memo.documentNumber}</td>
@@ -906,8 +812,20 @@ export function ProcureToPayPage({
                     </td>
                     <td className="px-4 text-right">
                       <div className="flex justify-end gap-2">
-                        {getMemoActionHref(memo.id) ? <ActionIconLink href={getMemoActionHref(memo.id) ?? "#"} icon={<Pencil className="h-4 w-4" />} title="แก้ไข" /> : null}
-                        <ActionIconButton onClick={() => openDetail("memo", memo.id)} icon={<Eye className="h-4 w-4" />} title="ดูรายละเอียด" />
+                        {getMemoActionHref(memo.id) ? (
+                          <ActionIconLink
+                            href={getMemoActionHref(memo.id) ?? "#"}
+                            icon={<Pencil className="h-4 w-4" />}
+                            title="แก้ไข"
+                            testId={`memo-action-${memo.id}`}
+                          />
+                        ) : null}
+                        <ActionIconButton
+                          onClick={() => openDetail("memo", memo.id)}
+                          icon={<Eye className="h-4 w-4" />}
+                          title="ดูรายละเอียด"
+                          testId={`memo-detail-${memo.id}`}
+                        />
                       </div>
                     </td>
                   </tr>
@@ -937,6 +855,7 @@ export function ProcureToPayPage({
                 {sortedPrItems.map((po) => (
                   <tr
                     key={po.id}
+                    data-testid={`pr-row-${po.id}`}
                     className={`border-t border-slate-100 transition hover:bg-[#fafdfb] ${highlightedId === po.id ? "soft-highlight" : ""}`}
                   >
                     <td className="px-4 text-slate-700">{po.prNumber ?? po.documentNumber}</td>
@@ -948,8 +867,20 @@ export function ProcureToPayPage({
                     </td>
                     <td className="px-4 text-right">
                       <div className="flex justify-end gap-2">
-                        {getPrActionHref(po.id) ? <ActionIconLink href={getPrActionHref(po.id) ?? "#"} icon={<Pencil className="h-4 w-4" />} title="แก้ไข" /> : null}
-                        <ActionIconButton onClick={() => openDetail("pr", po.id)} icon={<Eye className="h-4 w-4" />} title="ดูรายละเอียด" />
+                        {getPrActionHref(po.id) ? (
+                          <ActionIconLink
+                            href={getPrActionHref(po.id) ?? "#"}
+                            icon={<Pencil className="h-4 w-4" />}
+                            title="แก้ไข"
+                            testId={`pr-action-${po.id}`}
+                          />
+                        ) : null}
+                        <ActionIconButton
+                          onClick={() => openDetail("pr", po.id)}
+                          icon={<Eye className="h-4 w-4" />}
+                          title="ดูรายละเอียด"
+                          testId={`pr-detail-${po.id}`}
+                        />
                       </div>
                     </td>
                   </tr>
@@ -979,6 +910,7 @@ export function ProcureToPayPage({
                 {sortedPoItems.map((po) => (
                   <tr
                     key={po.id}
+                    data-testid={`po-row-${po.id}`}
                     className={`border-t border-slate-100 transition hover:bg-[#fafdfb] ${highlightedId === po.id ? "soft-highlight" : ""}`}
                   >
                     <td className="px-4 text-slate-700">{po.poNumber ?? po.documentNumber}</td>
@@ -1002,9 +934,19 @@ export function ProcureToPayPage({
                     <td className="px-4 text-right">
                       <div className="flex justify-end gap-2">
                         {getPoActionHref(po.id) ? (
-                          <ActionIconLink href={getPoActionHref(po.id) ?? "#"} icon={<Pencil className="h-4 w-4" />} title="อัปเดตสถานะ" />
+                          <ActionIconLink
+                            href={getPoActionHref(po.id) ?? "#"}
+                            icon={<Pencil className="h-4 w-4" />}
+                            title="อัปเดตสถานะ"
+                            testId={`po-action-${po.id}`}
+                          />
                         ) : null}
-                        <ActionIconButton onClick={() => openDetail("po", po.id)} icon={<Eye className="h-4 w-4" />} title="ดูรายละเอียด" />
+                        <ActionIconButton
+                          onClick={() => openDetail("po", po.id)}
+                          icon={<Eye className="h-4 w-4" />}
+                          title="ดูรายละเอียด"
+                          testId={`po-detail-${po.id}`}
+                        />
                       </div>
                     </td>
                   </tr>

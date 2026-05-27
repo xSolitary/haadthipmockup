@@ -49,9 +49,10 @@ export function canAccessPath(role: Role, pathname: string) {
   }
 
   if (role === "Vendor") {
+    const isVendorDeliveryActionPath = /^\/pr-po\/[^/]+\/action$/.test(pathname);
     return pathname === "/"
       ? false
-      : pathname === "/my-requests" || pathname === "/receiving";
+      : pathname === "/my-requests" || pathname === "/receiving" || isVendorDeliveryActionPath;
   }
 
   if (role === "Admin") {
